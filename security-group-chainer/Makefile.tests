@@ -1,0 +1,191 @@
+# ==============================================================================
+# Makefile for Security Group Chainer Testing
+# ==============================================================================
+
+.PHONY: help test test-unit test-integration test-e2e test-performance \
+        test-all coverage install-test clean lint format
+
+# Default target
+.DEFAULT_GOAL := help
+
+# Python and pytest settings
+PYTHON := python3
+PYTEST := pytest
+PIP := pip3
+SRC_DIR := src
+TEST_DIR := tests
+
+# Colors for output
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+##@ Help
+
+help: ## Display this help message
+	@echo "$(BLUE)Security Group Chainer - Test Suite$(NC)"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make $(GREEN)<target>$(NC)\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(BLUE)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Installation
+
+install-test: ## Install test dependencies
+	@echo "$(BLUE)Installing test dependencies...$(NC)"
+	$(PIP) install -r requirements-test.txt
+	@echo "$(GREEN)✓ Test dependencies installed$(NC)"
+
+install-dev: install-test ## Install all dependencies (including dev tools)
+	@echo "$(BLUE)Installing development dependencies...$(NC)"
+	$(PIP) install -r requirements.txt
+	@echo "$(GREEN)✓ All dependencies installed$(NC)"
+
+##@ Testing
+
+test: ## Run all tests (unit + integration + e2e)
+	@echo "$(BLUE)Running all tests...$(NC)"
+	$(PYTEST) -v $(TEST_DIR)
+
+test-unit: ## Run unit tests only (fast, no AWS)
+	@echo "$(BLUE)Running unit tests...$(NC)"
+	$(PYTEST) -v -m unit $(TEST_DIR)/unit/
+
+test-integration: ## Run integration tests (requires AWS credentials)
+	@echo "$(YELLOW)Running integration tests (requires AWS)...$(NC)"
+	$(PYTEST) -v -m integration $(TEST_DIR)/integration/
+
+test-e2e: ## Run end-to-end tests (requires Terraform)
+	@echo "$(YELLOW)Running E2E tests (requires Terraform)...$(NC)"
+	$(PYTEST) -v -m e2e $(TEST_DIR)/e2e/
+
+test-performance: ## Run performance tests
+	@echo "$(BLUE)Running performance tests...$(NC)"
+	$(PYTEST) -v -m performance $(TEST_DIR)/performance/
+
+test-all: test-unit test-integration test-e2e test-performance ## Run all test categories
+
+test-fast: test-unit ## Alias for test-unit (quick feedback)
+
+test-slow: ## Run only slow tests
+	@echo "$(YELLOW)Running slow tests...$(NC)"
+	$(PYTEST) -v -m slow $(TEST_DIR)
+
+##@ Coverage
+
+coverage: ## Run tests with coverage report
+	@echo "$(BLUE)Running tests with coverage...$(NC)"
+	$(PYTEST) --cov=$(SRC_DIR) --cov-report=html --cov-report=term-missing $(TEST_DIR)
+	@echo "$(GREEN)✓ Coverage report generated in htmlcov/$(NC)"
+
+coverage-unit: ## Coverage for unit tests only
+	@echo "$(BLUE)Running unit tests with coverage...$(NC)"
+	$(PYTEST) --cov=$(SRC_DIR) --cov-report=html --cov-report=term-missing -m unit $(TEST_DIR)/unit/
+
+coverage-report: ## Open coverage report in browser
+	@echo "$(BLUE)Opening coverage report...$(NC)"
+	@if [ -f htmlcov/index.html ]; then \
+		open htmlcov/index.html 2>/dev/null || xdg-open htmlcov/index.html 2>/dev/null || echo "$(RED)Cannot open browser. Report is at: htmlcov/index.html$(NC)"; \
+	else \
+		echo "$(RED)Coverage report not found. Run 'make coverage' first.$(NC)"; \
+	fi
+
+##@ Code Quality
+
+lint: ## Run linting checks
+	@echo "$(BLUE)Running linters...$(NC)"
+	$(PYTEST) --flake8 $(SRC_DIR)
+	@echo "$(GREEN)✓ Linting passed$(NC)"
+
+format: ## Format code with black
+	@echo "$(BLUE)Formatting code...$(NC)"
+	black $(SRC_DIR) $(TEST_DIR)
+	@echo "$(GREEN)✓ Code formatted$(NC)"
+
+type-check: ## Run type checking with mypy
+	@echo "$(BLUE)Running type checks...$(NC)"
+	mypy $(SRC_DIR)
+	@echo "$(GREEN)✓ Type checking passed$(NC)"
+
+quality: lint type-check ## Run all code quality checks
+
+##@ Docker
+
+docker-test: ## Run tests inside Docker container
+	@echo "$(BLUE)Building test Docker image...$(NC)"
+	docker build -t security-group-chainer-test -f Dockerfile.test .
+	@echo "$(BLUE)Running tests in container...$(NC)"
+	docker run --rm security-group-chainer-test pytest -v
+
+##@ Cleanup
+
+clean: ## Clean up test artifacts and caches
+	@echo "$(BLUE)Cleaning up...$(NC)"
+	rm -rf .pytest_cache/
+	rm -rf htmlcov/
+	rm -rf .coverage
+	rm -rf **/__pycache__/
+	rm -rf **/*.pyc
+	rm -rf .mypy_cache/
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	@echo "$(GREEN)✓ Cleanup complete$(NC)"
+
+clean-all: clean ## Deep clean including virtual environments
+	@echo "$(BLUE)Deep cleaning...$(NC)"
+	rm -rf venv/
+	rm -rf .tox/
+	@echo "$(GREEN)✓ Deep cleanup complete$(NC)"
+
+##@ Continuous Integration
+
+ci: clean install-test lint test-unit coverage ## Run CI pipeline (fast tests only)
+	@echo "$(GREEN)✓ CI pipeline completed successfully$(NC)"
+
+ci-full: clean install-test quality test-all coverage ## Run full CI pipeline (all tests)
+	@echo "$(GREEN)✓ Full CI pipeline completed successfully$(NC)"
+
+##@ Development
+
+watch: ## Watch for changes and run tests automatically (requires pytest-watch)
+	@echo "$(BLUE)Watching for changes...$(NC)"
+	ptw -- -v $(TEST_DIR)/unit/
+
+shell: ## Open Python shell with src in path
+	@PYTHONPATH=$(SRC_DIR) $(PYTHON)
+
+##@ Reporting
+
+test-report: ## Generate detailed test report
+	@echo "$(BLUE)Generating test report...$(NC)"
+	$(PYTEST) -v --html=test-report.html --self-contained-html $(TEST_DIR)
+	@echo "$(GREEN)✓ Test report generated: test-report.html$(NC)"
+
+benchmark: ## Run performance benchmarks
+	@echo "$(BLUE)Running benchmarks...$(NC)"
+	$(PYTEST) -v --benchmark-only $(TEST_DIR)/performance/
+
+##@ Information
+
+show-markers: ## Show available pytest markers
+	@echo "$(BLUE)Available test markers:$(NC)"
+	@$(PYTEST) --markers | grep "^@pytest.mark"
+
+show-fixtures: ## Show available fixtures
+	@echo "$(BLUE)Available fixtures:$(NC)"
+	@$(PYTEST) --fixtures -q
+
+show-config: ## Show pytest configuration
+	@echo "$(BLUE)Pytest configuration:$(NC)"
+	@cat pytest.ini
+
+##@ Quick Checks
+
+check: test-unit lint ## Quick check before commit (unit tests + lint)
+	@echo "$(GREEN)✓ Quick checks passed$(NC)"
+
+pre-commit: clean check coverage-unit ## Pre-commit checks
+	@echo "$(GREEN)✓ Ready to commit$(NC)"
+
+pre-push: clean test-all coverage ## Pre-push checks (all tests)
+	@echo "$(GREEN)✓ Ready to push$(NC)"

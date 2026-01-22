@@ -1,0 +1,16 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/metrics-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-metric-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "eyJtZXRyaWNfbmFtZSI6IkNQVVV0aWxpemF0aW9uIiwibmFtZXNwYWNlIjoiQVdTL0VDMiIsImRpbWVuc2lvbnMiOnsiSW5zdGFuY2VJZCI6ImktMTIzNDU2Nzg5MGFiY2RlZjAifSwidGltZXN0YW1wIjoxNzA1NDkyMjAwMDAwLCJ2YWx1ZSI6eyJtYXgiOjg1LjUsIm1pbiI6MTIuMywic3VtIjo0NTAuMiwiY291bnQiOjEwfSwidW5pdCI6IlBlcmNlbnQifQ=="
+    },
+    {
+      "recordId": "test-metric-002",
+      "approximateArrivalTimestamp": 1705492201000,
+      "data": "eyJtZXRyaWNfbmFtZSI6Ik5ldHdvcmtJbiIsIm5hbWVzcGFjZSI6IkFXUy9FQzIiLCJkaW1lbnNpb25zIjp7Ikluc3RhbmNlSWQiOiJpLTEyMzQ1Njc4OTBhYmNkZWYwIn0sInRpbWVzdGFtcCI6MTcwNTQ5MjIwMTAwMCwidmFsdWUiOnsibWF4IjoxMjM0NTY3OCwibWluIjo1MDAwMCwic3VtIjoxMjM0NTY3OCwiY291bnQiOjF9LCJ1bml0IjoiQnl0ZXMifQ=="
+    }
+  ]
+}

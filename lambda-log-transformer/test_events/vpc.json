@@ -1,0 +1,16 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/vpc-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-vpc-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "MiAxMjM0NTY3ODkwMTIgZW5pLTFhMmIzYzRkIDEwLjAuMS41IDE3Mi4zMS4xNi41IDQ5MTUyIDQ0MyA2IDIwIDQwMDAgMTU0ODExMDU0OCAxNTQ4MTEwNjA4IEFDQ0VQVCBPSW=="
+    },
+    {
+      "recordId": "test-vpc-002",
+      "approximateArrivalTimestamp": 1705492201000,
+      "data": "MiAxMjM0NTY3ODkwMTIgZW5pLTFhMmIzYzRkIDEwLjAuMS4xMCAxMC4wLjIuMjAgMzQ1NjcgNTQzMiA2IDEwIDIwMDAgMTU0ODExMDU1MCAxNTQ4MTEwNjEwIFJFSkVDVCBPSw=="
+    }
+  ]
+}

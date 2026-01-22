@@ -1,0 +1,16 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/eks-pods-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-eks-pod-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "eyJrdWJlcm5ldGVzIjp7Im5hbWVzcGFjZV9uYW1lIjoicHJvZHVjdGlvbiIsInBvZF9uYW1lIjoiZm9yZ2UtYXBpLTc4OWFiYzEyMy05eHl6IiwiY29udGFpbmVyX25hbWUiOiJhcHAiLCJjb250YWluZXJfaW1hZ2UiOiI4NzY1NDMyMTAuZGtyLmVjci51cy1lYXN0LTEuYW1hem9uYXdzLmNvbS9mb3JnZS1hcGk6bGF0ZXN0In0sImxvZyI6IntcImxldmVsXCI6XCJlcnJvclwiLFwibXNnXCI6XCJEYXRhYmFzZSBjb25uZWN0aW9uIGZhaWxlZFwiLFwidGltZXN0YW1wXCI6XCIyMDI2LTAxLTE3VDEwOjMwOjQ1WlwiLFwiZXJyb3JcIjpcImNvbm5lY3Rpb24gcmVmdXNlZDAxOlwiLFwiZGJfaG9zdFwiOlwiZm9yZ2UtcmRzLnByb2QuZXhhbXBsZS5jb21cIn0iLCJzdHJlYW0iOiJzdGRlcnIiLCJ0aW1lIjoiMjAyNi0wMS0xN1QxMDozMDo0NVoifQ=="
+    },
+    {
+      "recordId": "test-eks-pod-002",
+      "approximateArrivalTimestamp": 1705492201000,
+      "data": "eyJrdWJlcm5ldGVzIjp7Im5hbWVzcGFjZV9uYW1lIjoicHJvZHVjdGlvbiIsInBvZF9uYW1lIjoiZm9yZ2UtYXBpLTc4OWFiYzEyMy05eHl6IiwiY29udGFpbmVyX25hbWUiOiJhcHAifSwibG9nIjoiSU5GTzogUmVxdWVzdCBwcm9jZXNzZWQgc3VjY2Vzc2Z1bGx5IC0gR0VUIC9hcGkvdjEvaGVhbHRoIiwic3RyZWFtIjoic3Rkb3V0IiwidGltZSI6IjIwMjYtMDEtMTdUMTA6MzA6NDZaIn0="
+    }
+  ]
+}

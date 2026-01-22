@@ -1,0 +1,61 @@
+# Test Chains Configuration - Production-like
+version: "1.0"
+
+# Global settings
+timeout_seconds: 7200
+polling_interval_seconds: 15
+circuit_breaker_threshold: 10
+
+# Chain definitions
+chains:
+  # ALB to EKS Nodes - HTTP/HTTPS traffic
+  - name: alb-to-eks-nodes
+    master_tier: ALB
+    slave_tier: EKSNodes
+    protocol: tcp
+    ports:
+      - 80
+      - 443
+    bidirectional: false
+    description: "Allow ALB to forward traffic to EKS node groups"
+
+  # EKS Cluster to Nodes - Kubernetes API
+  - name: eks-cluster-nodes
+    master_tier: EKSCluster
+    slave_tier: EKSNodes
+    protocol: tcp
+    ports:
+      - 443    # Kubernetes API
+      - 10250  # Kubelet API
+    bidirectional: true
+    description: "Bidirectional communication between EKS control plane and worker nodes"
+
+  # EKS Nodes to RDS - Database connections
+  - name: eks-nodes-to-rds
+    master_tier: EKSNodes
+    slave_tier: RDS
+    protocol: tcp
+    ports:
+      - 5432  # PostgreSQL
+    bidirectional: false
+    description: "Allow EKS pods to connect to RDS database"
+
+  # EKS Nodes to Redis - Cache connections
+  - name: eks-nodes-to-redis
+    master_tier: EKSNodes
+    slave_tier: Redis
+    protocol: tcp
+    ports:
+      - 6379  # Redis
+    bidirectional: false
+    description: "Allow EKS pods to connect to ElastiCache Redis"
+
+  # EKS Nodes to VPC Endpoints - AWS services
+  - name: eks-nodes-to-vpc-endpoints
+    master_tier: EKSNodes
+    slave_tier: VPCEndpoints
+    protocol: tcp
+    ports:
+      - 443  # HTTPS for all AWS services
+    bidirectional: false
+    description: "Allow EKS pods to access AWS services via VPC endpoints"

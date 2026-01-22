@@ -1,0 +1,404 @@
+# /Users/mateuszsoltykiewicz/Library/Mobile Documents/com~apple~CloudDocs/Projects/Forge/forge-helpers/security-group-chainer/forge-chainer-config.yaml
+
+# ==============================================================================
+# SECURITY GROUP CHAINER - COMPLETE CONFIGURATION
+# ==============================================================================
+# Version: 1.0
+# Created: 2026-01-20
+# Purpose: Comprehensive security group chaining configuration for Forge Platform
+# ==============================================================================
+
+# ==============================================================================
+# GLOBAL SETTINGS
+# ==============================================================================
+
+# Configuration version (for future compatibility checks)
+version: "1.0"
+
+# AWS Region where security groups are managed
+# Can be overridden by --region CLI arg or AWS_REGION env var
+region: "us-east-2"  # US East (Ohio)
+
+# Customer and Project identifiers (for tagging/reporting)
+customer_name: "Sanofi"
+project_name: "Cronus"
+
+# Deployment environment (for tagging/reporting)
+environment: "Shared"  # Options: development, staging, production, shared
+
+# DR Tenant Name (for multi-tenant setups)
+# Can be used to differentiate security groups in DR scenarios
+dr_tenant: "Primary"
+
+# ==============================================================================
+# CHAINER EXECUTION SETTINGS
+# ==============================================================================
+
+# Maximum time (in seconds) to wait for security groups to appear
+# Recommended: 3600s (1h) for normal deployments, 7200s (2h) for large deployments
+timeout_seconds: 3600
+
+# Interval (in seconds) between polling attempts to check if security groups exist
+# Lower = faster detection, Higher = less AWS API calls
+# Recommended: 10s for development, 30s for production
+polling_interval_seconds: 10
+
+# Circuit breaker threshold - number of consecutive failures before opening circuit
+# Protects against AWS API rate limiting
+# After threshold is reached, circuit opens and recovers after 60s
+circuit_breaker_threshold: 5
+
+# ==============================================================================
+# REPORTING SETTINGS
+# ==============================================================================
+
+# Path where execution report will be saved (YAML format)
+# Can be overridden by --output CLI arg
+output_path: /tmp/chainer-report.yaml
+
+# Enable verbose logging (useful for debugging)
+verbose: true
+
+# VPC Discovery Settings
+vpc_discovery:
+  timeout_seconds: 1800      # Jak długo czekać na VPC
+  polling_interval_seconds: 15  # Co ile sekund sprawdzać
+
+# ==============================================================================
+# SECURITY GROUP CHAINS CONFIGURATION
+# ==============================================================================
+# Each chain defines a rule between two security group tiers
+#
+# Chain Fields:
+#   - name: Unique identifier for this chain
+#   - master_tier: Source security group tier (FirewallTier tag value)
+#   - master_purpose_filter: Optional filter by Purpose tag on master
+#   - slave_tier: Destination security group tier (FirewallTier tag value)
+#   - slave_purpose_filter: Optional filter by Purpose tag on slave
+#   - ports: List of ports to allow (e.g., [80, 443])
+#   - protocol: tcp, udp, or icmp (default: tcp)
+#   - bidirectional: true = create both ingress and egress rules (default: false)
+#   - description: Human-readable description of the rule's purpose
+# ==============================================================================
+
+chains:
+
+  # ============================================================================
+  # TIER 1: APPLICATION LOAD BALANCERS → EKS NODES
+  # ============================================================================
+  # Load balancers need to send HTTP/HTTPS traffic to Kubernetes worker nodes
+  
+  - name: alb-production-to-eks-nodes
+    master_tier: ALB
+    master_purpose_filter: production
+    slave_tier: EKSNodes
+    slave_purpose_filter: worker-nodes
+    ports: [80, 443]
+    protocol: tcp
+    bidirectional: false
+    description: "Production ALB can send HTTP/HTTPS traffic to EKS worker nodes"
+
+  - name: alb-staging-to-eks-nodes
+    master_tier: ALB
+    master_purpose_filter: staging
+    slave_tier: EKSNodes
+    slave_purpose_filter: worker-nodes
+    ports: [80, 443]
+    protocol: tcp
+    bidirectional: false
+    description: "Staging ALB can send HTTP/HTTPS traffic to EKS worker nodes"
+
+  - name: alb-development-to-eks-nodes
+    master_tier: ALB
+    master_purpose_filter: development
+    slave_tier: EKSNodes
+    slave_purpose_filter: worker-nodes
+    ports: [80, 443]
+    protocol: tcp
+    bidirectional: false
+    description: "Development ALB can send HTTP/HTTPS traffic to EKS worker nodes"
+
+  # ============================================================================
+  # TIER 2: EKS CONTROL PLANE ↔ EKS NODES
+  # ============================================================================
+  # CRITICAL: EKS cluster control plane needs bidirectional communication
+  # with worker nodes for cluster management
+  
+  - name: eks-cluster-to-nodes-bidirectional
+    master_tier: EKSCluster
+    master_purpose_filter: control-plane
+    slave_tier: EKSNodes
+    slave_purpose_filter: worker-nodes
+    ports: [443, 10250]
+    protocol: tcp
+    bidirectional: true
+    description: "CRITICAL: EKS control plane ↔ worker nodes bidirectional communication (API: 443, Kubelet: 10250)"
+
+  # ============================================================================
+  # TIER 3: EKS NODES → DATABASES & CACHING
+  # ============================================================================
+  # Kubernetes pods running on worker nodes need access to data tier
+  
+  - name: eks-nodes-to-rds-postgresql
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: RDS
+    slave_purpose_filter: rds-postgresql
+    ports: [5432]
+    protocol: tcp
+    bidirectional: false
+    description: "EKS pods can connect to PostgreSQL database on port 5432"
+
+  - name: eks-nodes-to-redis-cache
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: Redis
+    slave_purpose_filter: redis-cache
+    ports: [6379]
+    protocol: tcp
+    bidirectional: false
+    description: "EKS pods can connect to Redis cache on port 6379"
+
+  # ============================================================================
+  # TIER 4: EKS NODES → VPC ENDPOINTS (CRITICAL FOR PRIVATE CLUSTERS)
+  # ============================================================================
+  # Private EKS clusters require VPC Endpoints to access AWS services
+  # WITHOUT these rules, nodes cannot:
+  #   - Pull container images from ECR
+  #   - Register with EKS API
+  #   - Assume IAM roles (IRSA)
+  #   - Send logs to CloudWatch
+  
+  # --- CRITICAL VPC Endpoints (Required for cluster to function) ---
+  
+  - name: eks-nodes-to-vpc-endpoint-ecr-api
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ecr-api
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "CRITICAL: ECR API endpoint for container image metadata (ecr.api)"
+
+  - name: eks-nodes-to-vpc-endpoint-ecr-dkr
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ecr-dkr
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "CRITICAL: ECR Docker registry endpoint for pulling container images (ecr.dkr)"
+
+  - name: eks-nodes-to-vpc-endpoint-sts
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: sts
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "CRITICAL: STS endpoint for IAM role assumption (required for IRSA - IAM Roles for Service Accounts)"
+
+  - name: eks-nodes-to-vpc-endpoint-ec2
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ec2
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "CRITICAL: EC2 endpoint for instance metadata and ENI management"
+
+  - name: eks-nodes-to-vpc-endpoint-eks
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: eks
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "CRITICAL: EKS endpoint for cluster API operations"
+
+  # --- HIGH PRIORITY VPC Endpoints (Cluster Autoscaling & Load Balancing) ---
+  
+  - name: eks-nodes-to-vpc-endpoint-autoscaling
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: autoscaling
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "HIGH PRIORITY: Autoscaling endpoint for Cluster Autoscaler"
+
+  - name: eks-nodes-to-vpc-endpoint-elasticloadbalancing
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: elasticloadbalancing
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "HIGH PRIORITY: ELB endpoint for AWS Load Balancer Controller"
+
+  # --- IMPORTANT VPC Endpoints (Observability) ---
+  
+  - name: eks-nodes-to-vpc-endpoint-logs
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: logs
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "IMPORTANT: CloudWatch Logs endpoint for pod and container logging"
+
+  - name: eks-nodes-to-vpc-endpoint-monitoring
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: monitoring
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "IMPORTANT: CloudWatch Metrics endpoint for cluster monitoring"
+
+  # --- IMPORTANT VPC Endpoints (Security & Configuration) ---
+  
+  - name: eks-nodes-to-vpc-endpoint-kms
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: kms
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "IMPORTANT: KMS endpoint for envelope encryption of secrets"
+
+  - name: eks-nodes-to-vpc-endpoint-ssm
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ssm
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "IMPORTANT: SSM Parameter Store endpoint for configuration management"
+
+  - name: eks-nodes-to-vpc-endpoint-secretsmanager
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: secretsmanager
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "IMPORTANT: Secrets Manager endpoint for secrets retrieval"
+
+  # --- OPTIONAL VPC Endpoints (Additional Services) ---
+  
+  - name: eks-nodes-to-vpc-endpoint-lambda
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: lambda
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: Lambda endpoint for serverless function invocation"
+
+  - name: eks-nodes-to-vpc-endpoint-kinesis-streams
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: kinesis-streams
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: Kinesis Streams endpoint for real-time data streaming"
+
+  - name: eks-nodes-to-vpc-endpoint-kinesis-firehose
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: kinesis-firehose
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: Kinesis Firehose endpoint for data delivery to S3/Redshift"
+
+  - name: eks-nodes-to-vpc-endpoint-ec2messages
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ec2messages
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: EC2 Messages endpoint for SSM Session Manager"
+
+  - name: eks-nodes-to-vpc-endpoint-ssmmessages
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: ssmmessages
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: SSM Messages endpoint for Session Manager sessions"
+
+  - name: eks-nodes-to-vpc-endpoint-sqs
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: sqs
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: SQS endpoint for message queue access"
+
+  - name: eks-nodes-to-vpc-endpoint-sns
+    master_tier: EKSNodes
+    master_purpose_filter: worker-nodes
+    slave_tier: VPCEndpoints
+    slave_purpose_filter: sns
+    ports: [443]
+    protocol: tcp
+    bidirectional: false
+    description: "OPTIONAL: SNS endpoint for notifications and pub/sub"
+
+# ==============================================================================
+# NOTES & BEST PRACTICES
+# ==============================================================================
+#
+# 1. VPC ENDPOINTS - EGRESS RULES NOT NEEDED:
+#    VPC Endpoints are managed AWS ENIs. They do NOT need egress rules.
+#    Only ingress rules from sources (EKS, RDS, Redis) are required.
+#
+# 2. RDS/REDIS - VPC ENDPOINT ACCESS NOT NEEDED:
+#    Managed AWS services (RDS, ElastiCache) communicate with AWS APIs
+#    through AWS internal service links, NOT through customer VPC Endpoints.
+#
+# 3. BIDIRECTIONAL CHAINS:
+#    Use bidirectional: true ONLY when BOTH directions are needed:
+#    - EKS Cluster ↔ EKS Nodes (control plane communication)
+#    Most other chains should be unidirectional (false).
+#
+# 4. CHAIN PRIORITY:
+#    Chainer processes all chains concurrently (async).
+#    Priority is informational (CRITICAL, HIGH, IMPORTANT, OPTIONAL).
+#    All chains wait for security groups up to timeout_seconds.
+#
+# 5. GRACEFUL FAILURE:
+#    Chainer always exits with code 0, even if chains fail.
+#    Check output YAML report for detailed status of each chain.
+#
+# 6. TESTING CONFIGURATION:
+#    Before deploying to production:
+#    a) Validate YAML syntax: yamllint forge-chainer-config.yaml
+#    b) Dry-run test: python3 src/chainer.py --yaml-config forge-chainer-config.yaml --mode apply
+#    c) Check report: cat /tmp/chainer-report.yaml
+#
+# ==============================================================================

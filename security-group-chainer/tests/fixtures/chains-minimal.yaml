@@ -1,0 +1,13 @@
+# Minimal Test Configuration
+version: "1.0"
+timeout_seconds: 300
+polling_interval_seconds: 5
+circuit_breaker_threshold: 3
+
+chains:
+  - name: simple-chain
+    master_tier: ALB
+    slave_tier: EKS
+    protocol: tcp
+    ports: [80]
+    bidirectional: false

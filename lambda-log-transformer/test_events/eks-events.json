@@ -1,0 +1,16 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/eks-events-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-eks-event-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "eyJ0eXBlIjoiV2FybmluZyIsInJlYXNvbiI6IkZhaWxlZFNjaGVkdWxpbmciLCJtZXNzYWdlIjoiMC8zIG5vZGVzIGFyZSBhdmFpbGFibGU6IGluc3VmZmljaWVudCBjcHUiLCJpbnZvbHZlZE9iamVjdCI6eyJraW5kIjoiUG9kIiwibmFtZSI6ImZvcmdlLWFwaS14eXotNDU2IiwibmFtZXNwYWNlIjoicHJvZHVjdGlvbiIsImFwaVZlcnNpb24iOiJ2MSJ9LCJmaXJzdFRpbWVzdGFtcCI6IjIwMjYtMDEtMTdUMTA6MzA6NDVaIiwibGFzdFRpbWVzdGFtcCI6IjIwMjYtMDEtMTdUMTA6MzE6MTVaIiwiY291bnQiOjV9"
+    },
+    {
+      "recordId": "test-eks-event-002",
+      "approximateArrivalTimestamp": 1705492201000,
+      "data": "eyJ0eXBlIjoiTm9ybWFsIiwicmVhc29uIjoiU2NoZWR1bGVkIiwibWVzc2FnZSI6IlN1Y2Nlc3NmdWxseSBhc3NpZ25lZCBmb3JnZS1hcGkteHl6LTQ1NiB0byBpcC0xMC0wLTEtNTAuZWMyLmludGVybmFsIiwiaW52b2x2ZWRPYmplY3QiOnsia2luZCI6IlBvZCIsIm5hbWUiOiJmb3JnZS1hcGkteHl6LTQ1NiIsIm5hbWVzcGFjZSI6InByb2R1Y3Rpb24ifSwiZmlyc3RUaW1lc3RhbXAiOiIyMDI2LTAxLTE3VDEwOjMxOjIwWiJ9"
+    }
+  ]
+}

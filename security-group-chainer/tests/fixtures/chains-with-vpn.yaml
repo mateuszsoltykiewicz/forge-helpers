@@ -1,0 +1,53 @@
+# Test Chains Configuration - With VPN
+version: "1.0"
+timeout_seconds: 7200
+polling_interval_seconds: 15
+circuit_breaker_threshold: 10
+
+chains:
+  # Base chains
+  - name: alb-to-eks-nodes
+    master_tier: ALB
+    slave_tier: EKSNodes
+    protocol: tcp
+    ports: [80, 443]
+    bidirectional: false
+
+  - name: eks-cluster-nodes
+    master_tier: EKSCluster
+    slave_tier: EKSNodes
+    protocol: tcp
+    ports: [443, 10250]
+    bidirectional: true
+
+  - name: eks-nodes-to-rds
+    master_tier: EKSNodes
+    slave_tier: RDS
+    protocol: tcp
+    ports: [5432]
+    bidirectional: false
+
+  # VPN chains
+  - name: client-vpn-to-eks
+    master_tier: ClientVPN
+    slave_tier: EKSNodes
+    protocol: tcp
+    ports: [22, 443, 8080]
+    bidirectional: false
+    description: "VPN users can access EKS nodes for debugging"
+
+  - name: client-vpn-to-rds
+    master_tier: ClientVPN
+    slave_tier: RDS
+    protocol: tcp
+    ports: [5432]
+    bidirectional: false
+    description: "VPN users can access RDS for admin tasks"
+
+  - name: client-vpn-to-redis
+    master_tier: ClientVPN
+    slave_tier: Redis
+    protocol: tcp
+    ports: [6379]
+    bidirectional: false
+    description: "VPN users can access Redis for debugging"

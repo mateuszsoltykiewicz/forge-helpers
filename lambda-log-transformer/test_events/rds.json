@@ -1,0 +1,16 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/rds-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-rds-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "MjAyNi0wMS0xNyAxMDozMDo0NSBVVEMgWzEyMzRdOiBbNS0xXSB1c2VyPXBvc3RncmVzLGRiPWZvcmdlX3Byb2QgRVJST1I6ICBzeW50YXggZXJyb3IgYXQgb3IgbmVhciAiU0VMRUNUIiBhdCBjaGFyYWN0ZXIgMTU="
+    },
+    {
+      "recordId": "test-rds-002",
+      "approximateArrivalTimestamp": 1705492201000,
+      "data": "MjAyNi0wMS0xNyAxMDozMDo0NiBVVEMgWzEyMzVdOiBbNi0xXSB1c2VyPXBvc3RncmVzLGRiPWZvcmdlX3Byb2QgTE9HOiAgZHVyYXRpb246IDEyMy40NTYgbXMgc3RhdGVtZW50OiBTRUxFQ1QgKiBGUk9NIHVzZXJzIFdIRVJFIGlkID0gJDE="
+    }
+  ]
+}

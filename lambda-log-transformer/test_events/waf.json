@@ -1,0 +1,11 @@
+{
+  "deliveryStreamArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/waf-firehose-stream",
+  "region": "us-east-1",
+  "records": [
+    {
+      "recordId": "test-waf-001",
+      "approximateArrivalTimestamp": 1705492200000,
+      "data": "eyJ0aW1lc3RhbXAiOjE3MDU0OTIyMDAwMDAsImZvcm1hdFZlcnNpb24iOjEsIndlYkFjbElkIjoiYXJuOmF3czp3YWZyZWdpb25hbDp1cy1lYXN0LTE6MTIzNDU2Nzg5MDEyOndlYmFjbC9mb3JnZS13YWYvMTIzNDU2NzgiLCJ0ZXJtaW5hdGluZ1J1bGVJZCI6IkJsb2NrU1FMSWwiLCJ0ZXJtaW5hdGluZ1J1bGVUeXBlIjoiUkFURV9CQVNFRCIsImFjdGlvbiI6IkJMT0NLIiwiaHR0cFJlcXVlc3QiOnsiY2xpZW50SXAiOiIyMDMuMC4xMTMuMTAiLCJjb3VudHJ5IjoiVVMiLCJoZWFkZXJzIjpbeyJuYW1lIjoiSG9zdCIsInZhbHVlIjoiYXBpLmZvcmdlLmV4YW1wbGUuY29tIn0seyJuYW1lIjoiVXNlci1BZ2VudCIsInZhbHVlIjoiTW96aWxsYS81LjAifV0sInVyaSI6Ii9hcGkvbG9naW4iLCJhcmdzIjoiIiwiaHR0cFZlcnNpb24iOiJIVFRQLzEuMSIsImh0dHBNZXRob2QiOiJQT1NUIn0sInJ1bGVHcm91cExpc3QiOlt7InJ1bGVHcm91cElkIjoiQVdTLU1hbmFnZWRSdWxlc1NRTEJ1cm4iLCJ0ZXJtaW5hdGluZ1J1bGUiOnsicnVsZUlkIjoiQmxvY2tTUUxJIiwiYWN0aW9uIjoiQkxPQ0sifX1dfQ=="
+    }
+  ]
+}
