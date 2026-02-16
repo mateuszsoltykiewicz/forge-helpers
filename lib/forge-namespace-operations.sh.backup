@@ -1,0 +1,2315 @@
+#!/usr/bin/env bash
+#
+# Forge Namespace Operations Library V2
+#
+# Purpose: Comprehensive library for dynamic namespace hardening based on actual
+#          resource measurements (VPA, HPA, Goldilocks, pod limits).
+#
+# Architecture: Deploy → Measure → Harden (not static pre-allocation)
+#
+# Design Principles:
+#   1. Namespace-wide measurement (scan all workloads, aggregate resources)
+#   2. Priority waterfall: Goldilocks → VPA → HPA → Pod limits
+#   3. DaemonSet max capacity: Use Karpenter/ASG max nodes (not current count)
+#   4. 20% safety buffer (configurable)
+#   5. Label-based state tracking
+#
+# Author: Forge Platform Team
+# License: Proprietary
+# Version: 2.0.0
+
+set -euo pipefail
+
+# Source dependencies
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/forge-core.sh
+source "${SCRIPT_DIR}/forge-core.sh"
+
+#==============================================================================
+# CONSTANTS
+#==============================================================================
+
+# Namespace types (13 total)
+readonly VALID_NAMESPACE_TYPES=(
+    "application"
+    "middleware"
+    "forge-operator"
+    "forge-jobs"
+    "vault"
+    "argocd"
+    "cert-manager"
+    "privileged"
+    "keda"
+    "kyverno"
+    "monitoring"
+    "default"
+    "kube-system"
+)
+
+# Label prefix
+readonly LABEL_PREFIX="moai.forge.io"
+
+# Default configuration
+readonly DEFAULT_BUFFER_PERCENT=20
+readonly DEFAULT_MIN_VPA_AGE_DAYS=7
+readonly DEFAULT_MAX_CPU_CORES=64
+readonly DEFAULT_MAX_MEMORY_GB=128
+readonly DEFAULT_MAX_PODS=100
+
+# VPA minimum data age (seconds)
+readonly MIN_VPA_AGE_SECONDS=$((DEFAULT_MIN_VPA_AGE_DAYS * 24 * 60 * 60))
+
+#==============================================================================
+# SECTION 1: NAMESPACE MANAGEMENT FUNCTIONS
+#==============================================================================
+
+# Creates a namespace with initial labels (unhardened state)
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Namespace type (application, middleware, etc.)
+#   $3 - Owner (optional, defaults to "unknown")
+#   $4 - Project (optional, defaults to "unknown")
+#   $5 - Environment (optional, defaults to "unknown")
+#
+# Returns:
+#   0 on success, 1 on failure
+create_namespace() {
+    local namespace="${1:?Namespace name required}"
+    local ns_type="${2:?Namespace type required}"
+    local owner="${3:-unknown}"
+    local project="${4:-unknown}"
+    local environment="${5:-unknown}"
+    
+    log_info "Creating namespace '${namespace}' with type '${ns_type}'..."
+    
+    # Validate namespace type
+    if ! validate_namespace_type "${ns_type}"; then
+        log_error "Invalid namespace type: ${ns_type}"
+        log_error "Valid types: ${VALID_NAMESPACE_TYPES[*]}"
+        return 1
+    fi
+    
+    # Check if namespace already exists
+    if namespace_exists "${namespace}"; then
+        log_error "Namespace '${namespace}' already exists"
+        return 1
+    fi
+    
+    # Create namespace with labels
+    kubectl create namespace "${namespace}" \
+        --dry-run=client -o yaml | \
+    kubectl label --local -f - \
+        "${LABEL_PREFIX}/managed=true" \
+        "${LABEL_PREFIX}/type=${ns_type}" \
+        "${LABEL_PREFIX}/owner=${owner}" \
+        "${LABEL_PREFIX}/project=${project}" \
+        "${LABEL_PREFIX}/environment=${environment}" \
+        "${LABEL_PREFIX}/hardened=false" \
+        "${LABEL_PREFIX}/created-at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --dry-run=client -o yaml | \
+    kubectl apply -f -
+    
+    if [[ $? -eq 0 ]]; then
+        log_success "Namespace '${namespace}' created successfully"
+        return 0
+    else
+        log_error "Failed to create namespace '${namespace}'"
+        return 1
+    fi
+}
+
+# Checks if a namespace exists
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 if exists, 1 if not
+namespace_exists() {
+    local namespace="${1:?Namespace name required}"
+    kubectl get namespace "${namespace}" &>/dev/null
+}
+
+# Gets the namespace type from labels
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Namespace type (application, middleware, etc.) or "unknown"
+get_namespace_type() {
+    local namespace="${1:?Namespace name required}"
+    
+    if ! namespace_exists "${namespace}"; then
+        echo "unknown"
+        return 1
+    fi
+    
+    local ns_type
+    ns_type=$(kubectl get namespace "${namespace}" \
+        -o jsonpath="{.metadata.labels.moai\.forge\.io/type}" 2>/dev/null || echo "unknown")
+    
+    echo "${ns_type}"
+}
+
+# Gets the age of a namespace in seconds
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Age in seconds, or -1 if cannot determine
+get_namespace_age() {
+    local namespace="${1:?Namespace name required}"
+    
+    if ! namespace_exists "${namespace}"; then
+        echo "-1"
+        return 1
+    fi
+    
+    local created_at
+    created_at=$(kubectl get namespace "${namespace}" \
+        -o jsonpath="{.metadata.creationTimestamp}" 2>/dev/null)
+    
+    if [[ -z "${created_at}" ]]; then
+        echo "-1"
+        return 1
+    fi
+    
+    # Convert to seconds since epoch
+    local created_epoch
+    created_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${created_at}" +%s 2>/dev/null || echo "-1")
+    
+    if [[ "${created_epoch}" -eq -1 ]]; then
+        echo "-1"
+        return 1
+    fi
+    
+    local now_epoch
+    now_epoch=$(date +%s)
+    
+    local age=$((now_epoch - created_epoch))
+    echo "${age}"
+}
+
+# Checks if a namespace is hardened
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 if hardened, 1 if not
+is_namespace_hardened() {
+    local namespace="${1:?Namespace name required}"
+    
+    if ! namespace_exists "${namespace}"; then
+        return 1
+    fi
+    
+    local hardened
+    hardened=$(kubectl get namespace "${namespace}" \
+        -o jsonpath="{.metadata.labels.${LABEL_PREFIX}/hardened}" 2>/dev/null || echo "false")
+    
+    [[ "${hardened}" == "true" ]]
+}
+
+# Applies labels to a namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#   $@ - Labels in format "key=value"
+#
+# Returns:
+#   0 on success, 1 on failure
+apply_namespace_labels() {
+    local namespace="${1:?Namespace name required}"
+    shift
+    
+    if ! namespace_exists "${namespace}"; then
+        log_error "Namespace '${namespace}' does not exist"
+        return 1
+    fi
+    
+    if [[ $# -eq 0 ]]; then
+        log_error "No labels provided"
+        return 1
+    fi
+    
+    log_debug "Applying labels to namespace '${namespace}': $*"
+    
+    kubectl label namespace "${namespace}" "$@" --overwrite
+}
+
+# Updates hardening status labels
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Hardening source (vpa, hpa, goldilocks, pod-limits)
+#   $3 - CPU limit (e.g., "6000m")
+#   $4 - Memory limit (e.g., "12Gi")
+#   $5 - Pods limit (e.g., "50")
+#
+# Returns:
+#   0 on success, 1 on failure
+update_hardening_status() {
+    local namespace="${1:?Namespace name required}"
+    local source="${2:?Hardening source required}"
+    local cpu_limit="${3:?CPU limit required}"
+    local memory_limit="${4:?Memory limit required}"
+    local pods_limit="${5:?Pods limit required}"
+    
+    local timestamp
+    timestamp=$(date -u +%Y%m%d-%H%M%S)
+    
+    apply_namespace_labels "${namespace}" \
+        "${LABEL_PREFIX}/hardened=true" \
+        "${LABEL_PREFIX}/hardened-at=${timestamp}" \
+        "${LABEL_PREFIX}/hardening-source=${source}" \
+        "${LABEL_PREFIX}/quota-cpu-limit=${cpu_limit}" \
+        "${LABEL_PREFIX}/quota-memory-limit=${memory_limit}" \
+        "${LABEL_PREFIX}/quota-pods-limit=${pods_limit}"
+}
+
+# Gets a specific label value from a namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Label key (without prefix, e.g., "hardened")
+#
+# Outputs:
+#   Label value or empty string
+get_namespace_label() {
+    local namespace="${1:?Namespace name required}"
+    local label_key="${2:?Label key required}"
+    
+    if ! namespace_exists "${namespace}"; then
+        echo ""
+        return 1
+    fi
+    
+    kubectl get namespace "${namespace}" \
+        -o jsonpath="{.metadata.labels.moai\.forge\.io/${label_key}}" 2>/dev/null || echo ""
+}
+
+# Validates a namespace type
+#
+# Arguments:
+#   $1 - Namespace type to validate
+#
+# Returns:
+#   0 if valid, 1 if invalid
+validate_namespace_type() {
+    local ns_type="${1:?Namespace type required}"
+    
+    for valid_type in "${VALID_NAMESPACE_TYPES[@]}"; do
+        if [[ "${ns_type}" == "${valid_type}" ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Deletes a namespace (with safety checks)
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Force delete (true/false, default: false)
+#
+# Returns:
+#   0 on success, 1 on failure
+delete_namespace() {
+    local namespace="${1:?Namespace name required}"
+    local force="${2:-false}"
+    
+    if ! namespace_exists "${namespace}"; then
+        log_error "Namespace '${namespace}' does not exist"
+        return 1
+    fi
+    
+    # Check if namespace is managed by Forge
+    local managed
+    managed=$(get_namespace_label "${namespace}" "managed")
+    
+    if [[ "${managed}" != "true" ]]; then
+        log_error "Namespace '${namespace}' is not managed by Forge (moai.forge.io/managed != true)"
+        log_error "Refusing to delete unmanaged namespace"
+        return 1
+    fi
+    
+    # Check for workloads unless force=true
+    if [[ "${force}" != "true" ]]; then
+        local workload_count
+        workload_count=$(kubectl get deployments,statefulsets,daemonsets -n "${namespace}" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        
+        if [[ ${workload_count} -gt 0 ]]; then
+            log_error "Namespace '${namespace}' has ${workload_count} workloads"
+            log_error "Use --force to delete anyway"
+            return 1
+        fi
+    fi
+    
+    log_info "Deleting namespace '${namespace}'..."
+    kubectl delete namespace "${namespace}" --timeout=60s
+}
+
+#==============================================================================
+# SECTION 2: RESOURCE MEASUREMENT FUNCTIONS
+#==============================================================================
+
+# Main orchestrator: Measures namespace resources using all available data
+#
+# Measurement priority waterfall:
+#   1. Goldilocks recommendations (best, observability-based)
+#   2. VPA upperBound (P99 usage + headroom, 7-day minimum)
+#   3. HPA maxReplicas × pod limits (horizontal scale awareness)
+#   4. Pod resources.limits (fallback)
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Buffer percent (default: 20)
+#   $3 - Minimum VPA age in days (default: 7)
+#
+# Outputs:
+#   JSON object with:
+#   {
+#     "cpu_millicores": 12000,
+#     "memory_bytes": 25769803776,
+#     "pods": 30,
+#     "source": "vpa|hpa|pod-limits",
+#     "details": "..."
+#   }
+#
+# Returns:
+#   0 on success, 1 on failure
+measure_namespace_resources() {
+    local namespace="${1:?Namespace name required}"
+    local buffer_percent="${2:-${DEFAULT_BUFFER_PERCENT}}"
+    local min_vpa_age_days="${3:-${DEFAULT_MIN_VPA_AGE_DAYS}}"
+    
+    log_info "Measuring resources for namespace '${namespace}'..."
+    log_debug "Buffer: ${buffer_percent}%, Min VPA age: ${min_vpa_age_days} days"
+    
+    if ! namespace_exists "${namespace}"; then
+        log_error "Namespace '${namespace}' does not exist"
+        return 1
+    fi
+    
+    local cpu_millicores=0
+    local memory_bytes=0
+    local pods=0
+    local source=""
+    local details=""
+    
+    # Priority 1: Try Goldilocks (if available)
+    # TODO: Implement Goldilocks integration in future iteration
+    # For now, skip to VPA
+    
+    # Priority 2: Try VPA
+    local vpa_cpu vpa_memory
+    vpa_cpu=$(get_namespace_vpa_recommendations "${namespace}" "cpu" "${min_vpa_age_days}")
+    vpa_memory=$(get_namespace_vpa_recommendations "${namespace}" "memory" "${min_vpa_age_days}")
+    
+    if [[ -n "${vpa_cpu}" && "${vpa_cpu}" -gt 0 ]]; then
+        cpu_millicores="${vpa_cpu}"
+        memory_bytes="${vpa_memory}"
+        source="vpa"
+        details="VPA upperBound recommendations with ${buffer_percent}% buffer"
+        log_info "Using VPA recommendations: ${cpu_millicores}m CPU, ${memory_bytes} bytes memory"
+    else
+        # Priority 3: Try HPA
+        local hpa_pods
+        hpa_pods=$(get_namespace_hpa_max_pods "${namespace}")
+        
+        if [[ -n "${hpa_pods}" && "${hpa_pods}" -gt 0 ]]; then
+            cpu_millicores=$(calculate_namespace_hpa_cpu_needs "${namespace}" "${hpa_pods}")
+            memory_bytes=$(calculate_namespace_hpa_memory_needs "${namespace}" "${hpa_pods}")
+            source="hpa"
+            details="HPA maxReplicas (${hpa_pods} pods) × pod limits with ${buffer_percent}% buffer"
+            log_info "Using HPA-based calculation: ${hpa_pods} max pods, ${cpu_millicores}m CPU, ${memory_bytes} bytes memory"
+        else
+            # Priority 4: Fallback to pod limits
+            cpu_millicores=$(sum_namespace_pod_cpu_limits "${namespace}")
+            memory_bytes=$(sum_namespace_pod_memory_limits "${namespace}")
+            source="pod-limits"
+            details="Current pod limits with ${buffer_percent}% buffer"
+            log_info "Using pod limits fallback: ${cpu_millicores}m CPU, ${memory_bytes} bytes memory"
+        fi
+    fi
+    
+    # Calculate pod count
+    pods=$(get_namespace_hpa_max_pods "${namespace}")
+    if [[ -z "${pods}" || "${pods}" -eq 0 ]]; then
+        pods=$(count_non_hpa_pods "${namespace}")
+    fi
+    
+    # Apply safety buffer to CPU and memory only
+    # NOTE: Pods quota should NOT have buffer - it's already a hard maximum from:
+    # - HPA maxReplicas (declared limit)
+    # - KEDA maxReplicaCount (declared limit)  
+    # - PDB overhead (calculated extra pods)
+    # - DaemonSet max_nodes (infrastructure limit)
+    # Adding buffer would allow exceeding these declared limits!
+    cpu_millicores=$(apply_buffer "${cpu_millicores}" "${buffer_percent}")
+    memory_bytes=$(apply_buffer "${memory_bytes}" "${buffer_percent}")
+    
+    # Sanity checks
+    local max_cpu_millicores=$((DEFAULT_MAX_CPU_CORES * 1000))
+    local max_memory_bytes=$((DEFAULT_MAX_MEMORY_GB * 1024 * 1024 * 1024))
+    
+    if [[ ${cpu_millicores} -gt ${max_cpu_millicores} ]]; then
+        log_warn "Calculated CPU (${cpu_millicores}m) exceeds sanity limit (${max_cpu_millicores}m), capping"
+        cpu_millicores=${max_cpu_millicores}
+    fi
+    
+    if [[ ${memory_bytes} -gt ${max_memory_bytes} ]]; then
+        log_warn "Calculated memory (${memory_bytes} bytes) exceeds sanity limit (${max_memory_bytes} bytes), capping"
+        memory_bytes=${max_memory_bytes}
+    fi
+    
+    if [[ ${pods} -gt ${DEFAULT_MAX_PODS} ]]; then
+        log_warn "Calculated pods (${pods}) exceeds sanity limit (${DEFAULT_MAX_PODS}), capping"
+        pods=${DEFAULT_MAX_PODS}
+    fi
+    
+    # Round up to avoid precision issues
+    cpu_millicores=$((cpu_millicores + 99 - (cpu_millicores - 1) % 100))
+    memory_bytes=$((memory_bytes + 1048576 - (memory_bytes - 1) % 1048576))  # Round to nearest Mi
+    
+    # Output JSON
+    cat <<EOF
+{
+  "cpu_millicores": ${cpu_millicores},
+  "memory_bytes": ${memory_bytes},
+  "pods": ${pods},
+  "source": "${source}",
+  "details": "${details}"
+}
+EOF
+    
+    return 0
+}
+
+# Gets VPA recommendations for a namespace (namespace-wide scan)
+#
+# Scans ALL VPAs in namespace, multiplies upperBound by replica count, sums
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Resource type ("cpu" or "memory")
+#   $3 - Minimum VPA age in days (default: 7)
+#
+# Outputs:
+#   Total millicores (for CPU) or bytes (for memory), or empty string if no valid VPA
+get_namespace_vpa_recommendations() {
+    local namespace="${1:?Namespace name required}"
+    local resource_type="${2:?Resource type required (cpu or memory)}"
+    local min_age_days="${3:-${DEFAULT_MIN_VPA_AGE_DAYS}}"
+    
+    log_debug "Scanning VPAs in namespace '${namespace}' for ${resource_type}..."
+    
+    # Get all VPAs in namespace
+    local vpas
+    vpas=$(kubectl get vpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -z "${vpas}" ]]; then
+        log_debug "No VPAs found in namespace '${namespace}'"
+        return 0
+    fi
+    
+    local total=0
+    local min_age_seconds=$((min_age_days * 24 * 60 * 60))
+    
+    while IFS= read -r vpa_name; do
+        [[ -z "${vpa_name}" ]] && continue
+        
+        log_debug "Processing VPA: ${vpa_name}"
+        
+        # Check VPA age (from lastTransitionTime of RecommendationProvided condition)
+        local last_transition
+        last_transition=$(kubectl get vpa "${vpa_name}" -n "${namespace}" \
+            -o jsonpath='{.status.conditions[?(@.type=="RecommendationProvided")].lastTransitionTime}' 2>/dev/null || echo "")
+        
+        if [[ -z "${last_transition}" ]]; then
+            log_debug "VPA ${vpa_name} has no RecommendationProvided condition, skipping"
+            continue
+        fi
+        
+        local transition_epoch
+        transition_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${last_transition}" +%s 2>/dev/null || echo "0")
+        local now_epoch
+        now_epoch=$(date +%s)
+        local vpa_age=$((now_epoch - transition_epoch))
+        
+        if [[ ${vpa_age} -lt ${min_age_seconds} ]]; then
+            log_warn "VPA ${vpa_name} is only $((vpa_age / 86400)) days old (min: ${min_age_days}), skipping"
+            continue
+        fi
+        
+        # Get target ref (Deployment, StatefulSet, etc.)
+        local target_kind target_name
+        target_kind=$(kubectl get vpa "${vpa_name}" -n "${namespace}" -o jsonpath='{.spec.targetRef.kind}' 2>/dev/null || echo "")
+        target_name=$(kubectl get vpa "${vpa_name}" -n "${namespace}" -o jsonpath='{.spec.targetRef.name}' 2>/dev/null || echo "")
+        
+        if [[ -z "${target_kind}" || -z "${target_name}" ]]; then
+            log_debug "VPA ${vpa_name} has no targetRef, skipping"
+            continue
+        fi
+        
+        # Get replica count
+        local replicas=1
+        case "${target_kind}" in
+            Deployment|StatefulSet)
+                replicas=$(kubectl get "${target_kind,,}" "${target_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+                ;;
+            DaemonSet)
+                # For DaemonSets, use max node capacity
+                replicas=$(get_max_node_capacity "${namespace}")
+                ;;
+        esac
+        
+        # Get upperBound recommendation
+        local upper_bound
+        if [[ "${resource_type}" == "cpu" ]]; then
+            upper_bound=$(kubectl get vpa "${vpa_name}" -n "${namespace}" \
+                -o jsonpath='{.status.recommendation.containerRecommendations[0].upperBound.cpu}' 2>/dev/null || echo "")
+        else
+            upper_bound=$(kubectl get vpa "${vpa_name}" -n "${namespace}" \
+                -o jsonpath='{.status.recommendation.containerRecommendations[0].upperBound.memory}' 2>/dev/null || echo "")
+        fi
+        
+        if [[ -z "${upper_bound}" ]]; then
+            log_debug "VPA ${vpa_name} has no upperBound for ${resource_type}, skipping"
+            continue
+        fi
+        
+        # Convert to base units
+        local value_in_base_units
+        if [[ "${resource_type}" == "cpu" ]]; then
+            value_in_base_units=$(convert_cpu_to_millicores "${upper_bound}")
+        else
+            value_in_base_units=$(convert_memory_to_bytes "${upper_bound}")
+        fi
+        
+        # Multiply by replicas
+        local workload_total=$((value_in_base_units * replicas))
+        total=$((total + workload_total))
+        
+        log_debug "VPA ${vpa_name} (${target_kind}/${target_name}): ${upper_bound} × ${replicas} replicas = ${workload_total} (total: ${total})"
+    done <<< "${vpas}"
+    
+    if [[ ${total} -eq 0 ]]; then
+        log_debug "No valid VPA recommendations found"
+        return 0
+    fi
+    
+    echo "${total}"
+}
+
+# Gets maximum pod count based on HPA + non-HPA workloads
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total maximum pods, or 0 if none found
+get_namespace_hpa_max_pods() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Calculating max pods for namespace '${namespace}'..."
+    
+    # Sum all HPA maxReplicas
+    local hpa_max_pods=0
+    local hpa_targets=()
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa_name; do
+            [[ -z "${hpa_name}" ]] && continue
+            
+            local max_replicas target_kind target_name
+            max_replicas=$(kubectl get hpa "${hpa_name}" -n "${namespace}" -o jsonpath='{.spec.maxReplicas}' 2>/dev/null || echo "0")
+            target_kind=$(kubectl get hpa "${hpa_name}" -n "${namespace}" -o jsonpath='{.spec.scaleTargetRef.kind}' 2>/dev/null || echo "")
+            target_name=$(kubectl get hpa "${hpa_name}" -n "${namespace}" -o jsonpath='{.spec.scaleTargetRef.name}' 2>/dev/null || echo "")
+            
+            hpa_max_pods=$((hpa_max_pods + max_replicas))
+            hpa_targets+=("${target_kind}/${target_name}")
+            
+            log_debug "HPA ${hpa_name}: maxReplicas=${max_replicas} (target: ${target_kind}/${target_name})"
+        done <<< "${hpas}"
+    fi
+    
+    # Sum all KEDA ScaledObjects maxReplicaCount
+    local keda_max_pods=0
+    local keda_targets=()
+    local scaled_objects
+    scaled_objects=$(kubectl get scaledobjects.keda.sh -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' 2>/dev/null || echo "")
+    
+    if [[ -n "${scaled_objects}" ]]; then
+        while IFS= read -r so_name; do
+            [[ -z "${so_name}" ]] && continue
+            
+            local max_replicas target_kind target_name
+            max_replicas=$(kubectl get scaledobjects.keda.sh "${so_name}" -n "${namespace}" -o jsonpath='{.spec.maxReplicaCount}' 2>/dev/null || echo "0")
+            target_kind=$(kubectl get scaledobjects.keda.sh "${so_name}" -n "${namespace}" -o jsonpath='{.spec.scaleTargetRef.kind}' 2>/dev/null || echo "")
+            target_name=$(kubectl get scaledobjects.keda.sh "${so_name}" -n "${namespace}" -o jsonpath='{.spec.scaleTargetRef.name}' 2>/dev/null || echo "")
+            
+            keda_max_pods=$((keda_max_pods + max_replicas))
+            keda_targets+=("${target_kind}/${target_name}")
+            
+            log_debug "KEDA ${so_name}: maxReplicaCount=${max_replicas} (target: ${target_kind}/${target_name})"
+        done <<< "${scaled_objects}"
+    fi
+    
+    # Add non-HPA/non-KEDA workloads (including DaemonSets with max_nodes)
+    local non_hpa_pods
+    non_hpa_pods=$(count_non_hpa_pods "${namespace}")
+    
+    # Calculate PDB overhead (need extra pods to satisfy minAvailable during disruptions)
+    local pdb_overhead=0
+    local pdbs
+    pdbs=$(kubectl get poddisruptionbudget -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${pdbs}" ]]; then
+        while IFS= read -r pdb_name; do
+            [[ -z "${pdb_name}" ]] && continue
+            
+            # Check if this PDB applies to HPA/KEDA managed workloads
+            local selector
+            selector=$(kubectl get pdb "${pdb_name}" -n "${namespace}" -o jsonpath='{.spec.selector.matchLabels}' 2>/dev/null || echo "")
+            
+            if [[ -n "${selector}" ]]; then
+                # Get minAvailable (can be number or percentage)
+                local min_available
+                min_available=$(kubectl get pdb "${pdb_name}" -n "${namespace}" -o jsonpath='{.spec.minAvailable}' 2>/dev/null || echo "0")
+                
+                # If minAvailable is a number (not percentage), add 1 for disruption overhead
+                if [[ "${min_available}" =~ ^[0-9]+$ ]]; then
+                    log_debug "PDB ${pdb_name}: minAvailable=${min_available}, adding +1 overhead"
+                    pdb_overhead=$((pdb_overhead + 1))
+                fi
+            fi
+        done <<< "${pdbs}"
+    fi
+    
+    local total=$((hpa_max_pods + keda_max_pods + non_hpa_pods + pdb_overhead))
+    
+    log_debug "HPA max pods: ${hpa_max_pods}, KEDA max pods: ${keda_max_pods}, Non-HPA pods: ${non_hpa_pods}, PDB overhead: ${pdb_overhead}, Total: ${total}"
+    
+    echo "${total}"
+}
+
+# Calculates CPU needed for HPA maxReplicas + non-HPA workloads
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - HPA max pods (from get_namespace_hpa_max_pods)
+#
+# Outputs:
+#   Total millicores needed
+calculate_namespace_hpa_cpu_needs() {
+    local namespace="${1:?Namespace name required}"
+    local hpa_max_pods="${2:?HPA max pods required}"
+    
+    log_debug "Calculating HPA CPU needs for namespace '${namespace}'..."
+    
+    # Get HPA-managed deployments and their CPU limits
+    local hpa_cpu=0
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa; do
+            [[ -z "${hpa}" ]] && continue
+            
+            local hpa_name target_kind target_name max_replicas
+            hpa_name=$(echo "${hpa}" | jq -r '.metadata.name')
+            target_kind=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.name')
+            max_replicas=$(echo "${hpa}" | jq -r '.spec.maxReplicas')
+            
+            # Get pod CPU limit from deployment/statefulset template
+            local cpu_limit_str
+            cpu_limit_str=$(kubectl get "${target_kind,,}" "${target_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "0")
+            
+            local cpu_limit_millicores
+            cpu_limit_millicores=$(convert_cpu_to_millicores "${cpu_limit_str}")
+            
+            local workload_cpu=$((cpu_limit_millicores * max_replicas))
+            hpa_cpu=$((hpa_cpu + workload_cpu))
+            
+            log_debug "HPA ${hpa_name} (${target_kind}/${target_name}): ${cpu_limit_millicores}m × ${max_replicas} = ${workload_cpu}m"
+        done <<< "${hpas}"
+    fi
+    
+    # Add non-HPA CPU
+    local non_hpa_cpu
+    non_hpa_cpu=$(calculate_non_hpa_cpu "${namespace}")
+    
+    local total=$((hpa_cpu + non_hpa_cpu))
+    
+    log_debug "HPA CPU: ${hpa_cpu}m, Non-HPA CPU: ${non_hpa_cpu}m, Total: ${total}m"
+    
+    echo "${total}"
+}
+
+# Calculates memory needed for HPA maxReplicas + non-HPA workloads
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - HPA max pods (from get_namespace_hpa_max_pods)
+#
+# Outputs:
+#   Total bytes needed
+calculate_namespace_hpa_memory_needs() {
+    local namespace="${1:?Namespace name required}"
+    local hpa_max_pods="${2:?HPA max pods required}"
+    
+    log_debug "Calculating HPA memory needs for namespace '${namespace}'..."
+    
+    # Get HPA-managed deployments and their memory limits
+    local hpa_memory=0
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa; do
+            [[ -z "${hpa}" ]] && continue
+            
+            local hpa_name target_kind target_name max_replicas
+            hpa_name=$(echo "${hpa}" | jq -r '.metadata.name')
+            target_kind=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.name')
+            max_replicas=$(echo "${hpa}" | jq -r '.spec.maxReplicas')
+            
+            # Get pod memory limit from deployment/statefulset template
+            local memory_limit_str
+            memory_limit_str=$(kubectl get "${target_kind,,}" "${target_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "0")
+            
+            local memory_limit_bytes
+            memory_limit_bytes=$(convert_memory_to_bytes "${memory_limit_str}")
+            
+            local workload_memory=$((memory_limit_bytes * max_replicas))
+            hpa_memory=$((hpa_memory + workload_memory))
+            
+            log_debug "HPA ${hpa_name} (${target_kind}/${target_name}): ${memory_limit_bytes} bytes × ${max_replicas} = ${workload_memory} bytes"
+        done <<< "${hpas}"
+    fi
+    
+    # Add non-HPA memory
+    local non_hpa_memory
+    non_hpa_memory=$(calculate_non_hpa_memory "${namespace}")
+    
+    local total=$((hpa_memory + non_hpa_memory))
+    
+    log_debug "HPA memory: ${hpa_memory} bytes, Non-HPA memory: ${non_hpa_memory} bytes, Total: ${total} bytes"
+    
+    echo "${total}"
+}
+
+# Calculates CPU for workloads NOT managed by HPA
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total millicores for non-HPA workloads
+calculate_non_hpa_cpu() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Calculating non-HPA CPU for namespace '${namespace}'..."
+    
+    # Get all HPA target references
+    local hpa_targets=()
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa; do
+            [[ -z "${hpa}" ]] && continue
+            
+            local target_kind target_name
+            target_kind=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.name')
+            hpa_targets+=("${target_kind}/${target_name}")
+        done <<< "${hpas}"
+    fi
+    
+    local total_cpu=0
+    
+    # Process Deployments
+    local deployments
+    deployments=$(kubectl get deployment -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${deployments}" ]]; then
+        while IFS= read -r deploy_name; do
+            [[ -z "${deploy_name}" ]] && continue
+            
+            # Check if HPA-managed
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "Deployment/${deploy_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]]; then
+                log_debug "Deployment ${deploy_name} is HPA-managed, skipping"
+                continue
+            fi
+            
+            # Get replicas and CPU limit
+            local replicas cpu_limit_str cpu_limit_millicores
+            replicas=$(kubectl get deployment "${deploy_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            cpu_limit_str=$(kubectl get deployment "${deploy_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "0")
+            cpu_limit_millicores=$(convert_cpu_to_millicores "${cpu_limit_str}")
+            
+            local workload_cpu=$((cpu_limit_millicores * replicas))
+            total_cpu=$((total_cpu + workload_cpu))
+            
+            log_debug "Deployment ${deploy_name} (non-HPA): ${cpu_limit_millicores}m × ${replicas} = ${workload_cpu}m"
+        done <<< "${deployments}"
+    fi
+    
+    # Process StatefulSets
+    local statefulsets
+    statefulsets=$(kubectl get statefulset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${statefulsets}" ]]; then
+        while IFS= read -r sts_name; do
+            [[ -z "${sts_name}" ]] && continue
+            
+            # Check if HPA-managed
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "StatefulSet/${sts_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]]; then
+                log_debug "StatefulSet ${sts_name} is HPA-managed, skipping"
+                continue
+            fi
+            
+            local replicas cpu_limit_str cpu_limit_millicores
+            replicas=$(kubectl get statefulset "${sts_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            cpu_limit_str=$(kubectl get statefulset "${sts_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "0")
+            cpu_limit_millicores=$(convert_cpu_to_millicores "${cpu_limit_str}")
+            
+            local workload_cpu=$((cpu_limit_millicores * replicas))
+            total_cpu=$((total_cpu + workload_cpu))
+            
+            log_debug "StatefulSet ${sts_name} (non-HPA): ${cpu_limit_millicores}m × ${replicas} = ${workload_cpu}m"
+        done <<< "${statefulsets}"
+    fi
+    
+    # Process DaemonSets (ALWAYS non-HPA, use max node capacity)
+    local daemonsets
+    daemonsets=$(kubectl get daemonset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${daemonsets}" ]]; then
+        local max_nodes
+        max_nodes=$(get_max_node_capacity "${namespace}")
+        
+        while IFS= read -r ds_name; do
+            [[ -z "${ds_name}" ]] && continue
+            
+            local cpu_limit_str cpu_limit_millicores
+            cpu_limit_str=$(kubectl get daemonset "${ds_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "0")
+            cpu_limit_millicores=$(convert_cpu_to_millicores "${cpu_limit_str}")
+            
+            local workload_cpu=$((cpu_limit_millicores * max_nodes))
+            total_cpu=$((total_cpu + workload_cpu))
+            
+            log_debug "DaemonSet ${ds_name}: ${cpu_limit_millicores}m × ${max_nodes} max nodes = ${workload_cpu}m"
+        done <<< "${daemonsets}"
+    fi
+    
+    echo "${total_cpu}"
+}
+
+# Calculates memory for workloads NOT managed by HPA
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total bytes for non-HPA workloads
+calculate_non_hpa_memory() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Calculating non-HPA memory for namespace '${namespace}'..."
+    
+    # Get all HPA target references
+    local hpa_targets=()
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa; do
+            [[ -z "${hpa}" ]] && continue
+            
+            local target_kind target_name
+            target_kind=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.name')
+            hpa_targets+=("${target_kind}/${target_name}")
+        done <<< "${hpas}"
+    fi
+    
+    local total_memory=0
+    
+    # Process Deployments
+    local deployments
+    deployments=$(kubectl get deployment -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${deployments}" ]]; then
+        while IFS= read -r deploy_name; do
+            [[ -z "${deploy_name}" ]] && continue
+            
+            # Check if HPA-managed
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "Deployment/${deploy_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]]; then
+                continue
+            fi
+            
+            local replicas memory_limit_str memory_limit_bytes
+            replicas=$(kubectl get deployment "${deploy_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            memory_limit_str=$(kubectl get deployment "${deploy_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "0")
+            memory_limit_bytes=$(convert_memory_to_bytes "${memory_limit_str}")
+            
+            local workload_memory=$((memory_limit_bytes * replicas))
+            total_memory=$((total_memory + workload_memory))
+        done <<< "${deployments}"
+    fi
+    
+    # Process StatefulSets
+    local statefulsets
+    statefulsets=$(kubectl get statefulset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${statefulsets}" ]]; then
+        while IFS= read -r sts_name; do
+            [[ -z "${sts_name}" ]] && continue
+            
+            # Check if HPA-managed
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "StatefulSet/${sts_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]]; then
+                continue
+            fi
+            
+            local replicas memory_limit_str memory_limit_bytes
+            replicas=$(kubectl get statefulset "${sts_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            memory_limit_str=$(kubectl get statefulset "${sts_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "0")
+            memory_limit_bytes=$(convert_memory_to_bytes "${memory_limit_str}")
+            
+            local workload_memory=$((memory_limit_bytes * replicas))
+            total_memory=$((total_memory + workload_memory))
+        done <<< "${statefulsets}"
+    fi
+    
+    # Process DaemonSets
+    local daemonsets
+    daemonsets=$(kubectl get daemonset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${daemonsets}" ]]; then
+        local max_nodes
+        max_nodes=$(get_max_node_capacity "${namespace}")
+        
+        while IFS= read -r ds_name; do
+            [[ -z "${ds_name}" ]] && continue
+            
+            local memory_limit_str memory_limit_bytes
+            memory_limit_str=$(kubectl get daemonset "${ds_name}" -n "${namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "0")
+            memory_limit_bytes=$(convert_memory_to_bytes "${memory_limit_str}")
+            
+            local workload_memory=$((memory_limit_bytes * max_nodes))
+            total_memory=$((total_memory + workload_memory))
+        done <<< "${daemonsets}"
+    fi
+    
+    echo "${total_memory}"
+}
+
+# Counts pods NOT managed by HPA or KEDA (for quota calculation)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total pod count for non-HPA/non-KEDA workloads (including DaemonSets with max_nodes)
+count_non_hpa_pods() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Counting non-HPA/non-KEDA pods in namespace '${namespace}'..."
+    
+    # Get all HPA target references
+    local hpa_targets=()
+    local hpas
+    hpas=$(kubectl get hpa -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' || echo "")
+    
+    if [[ -n "${hpas}" ]]; then
+        while IFS= read -r hpa; do
+            [[ -z "${hpa}" ]] && continue
+            
+            local target_kind target_name
+            target_kind=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${hpa}" | jq -r '.spec.scaleTargetRef.name')
+            hpa_targets+=("${target_kind}/${target_name}")
+        done <<< "${hpas}"
+    fi
+    
+    # Get all KEDA ScaledObject target references
+    local keda_targets=()
+    local scaled_objects
+    scaled_objects=$(kubectl get scaledobjects.keda.sh -n "${namespace}" -o json 2>/dev/null | jq -r '.items[]' 2>/dev/null || echo "")
+    
+    if [[ -n "${scaled_objects}" ]]; then
+        while IFS= read -r so; do
+            [[ -z "${so}" ]] && continue
+            
+            local target_kind target_name
+            target_kind=$(echo "${so}" | jq -r '.spec.scaleTargetRef.kind')
+            target_name=$(echo "${so}" | jq -r '.spec.scaleTargetRef.name')
+            keda_targets+=("${target_kind}/${target_name}")
+        done <<< "${scaled_objects}"
+    fi
+    
+    local total_pods=0
+    
+    # Deployments
+    local deployments
+    deployments=$(kubectl get deployment -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${deployments}" ]]; then
+        while IFS= read -r deploy_name; do
+            [[ -z "${deploy_name}" ]] && continue
+            
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "Deployment/${deploy_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            local is_keda_managed=false
+            if [[ ${#keda_targets[@]} -gt 0 ]]; then
+                for target in "${keda_targets[@]}"; do
+                    if [[ "${target}" == "Deployment/${deploy_name}" ]]; then
+                        is_keda_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]] || [[ "${is_keda_managed}" == "true" ]]; then
+                continue
+            fi
+            
+            local replicas
+            replicas=$(kubectl get deployment "${deploy_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            total_pods=$((total_pods + replicas))
+        done <<< "${deployments}"
+    fi
+    
+    # StatefulSets
+    local statefulsets
+    statefulsets=$(kubectl get statefulset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${statefulsets}" ]]; then
+        while IFS= read -r sts_name; do
+            [[ -z "${sts_name}" ]] && continue
+            
+            local is_hpa_managed=false
+            if [[ ${#hpa_targets[@]} -gt 0 ]]; then
+                for target in "${hpa_targets[@]}"; do
+                    if [[ "${target}" == "StatefulSet/${sts_name}" ]]; then
+                        is_hpa_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            local is_keda_managed=false
+            if [[ ${#keda_targets[@]} -gt 0 ]]; then
+                for target in "${keda_targets[@]}"; do
+                    if [[ "${target}" == "StatefulSet/${sts_name}" ]]; then
+                        is_keda_managed=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "${is_hpa_managed}" == "true" ]] || [[ "${is_keda_managed}" == "true" ]]; then
+                continue
+            fi
+            
+            local replicas
+            replicas=$(kubectl get statefulset "${sts_name}" -n "${namespace}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+            total_pods=$((total_pods + replicas))
+        done <<< "${statefulsets}"
+    fi
+    
+    # DaemonSets (use max node capacity)
+    local daemonsets
+    daemonsets=$(kubectl get daemonset -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -n "${daemonsets}" ]]; then
+        local max_nodes
+        max_nodes=$(get_max_node_capacity "${namespace}")
+        
+        local ds_count
+        ds_count=$(echo "${daemonsets}" | grep -c '^' || echo "0")
+        
+        total_pods=$((total_pods + (ds_count * max_nodes)))
+    fi
+    
+    echo "${total_pods}"
+}
+
+# Sums CPU limits from all pods in namespace (fallback method)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total millicores
+sum_namespace_pod_cpu_limits() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Summing pod CPU limits in namespace '${namespace}'..."
+    
+    local total_cpu=0
+    local pods
+    pods=$(kubectl get pods -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -z "${pods}" ]]; then
+        log_debug "No pods found in namespace '${namespace}'"
+        echo "0"
+        return 0
+    fi
+    
+    while IFS= read -r pod_name; do
+        [[ -z "${pod_name}" ]] && continue
+        
+        local cpu_limit_str
+        cpu_limit_str=$(kubectl get pod "${pod_name}" -n "${namespace}" \
+            -o jsonpath='{.spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "0")
+        
+        local cpu_limit_millicores
+        cpu_limit_millicores=$(convert_cpu_to_millicores "${cpu_limit_str}")
+        
+        total_cpu=$((total_cpu + cpu_limit_millicores))
+    done <<< "${pods}"
+    
+    log_debug "Total pod CPU limits: ${total_cpu}m"
+    
+    echo "${total_cpu}"
+}
+
+# Sums memory limits from all pods in namespace (fallback method)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   Total bytes
+sum_namespace_pod_memory_limits() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Summing pod memory limits in namespace '${namespace}'..."
+    
+    local total_memory=0
+    local pods
+    pods=$(kubectl get pods -n "${namespace}" -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -z "${pods}" ]]; then
+        log_debug "No pods found in namespace '${namespace}'"
+        echo "0"
+        return 0
+    fi
+    
+    while IFS= read -r pod_name; do
+        [[ -z "${pod_name}" ]] && continue
+        
+        local memory_limit_str
+        memory_limit_str=$(kubectl get pod "${pod_name}" -n "${namespace}" \
+            -o jsonpath='{.spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "0")
+        
+        local memory_limit_bytes
+        memory_limit_bytes=$(convert_memory_to_bytes "${memory_limit_str}")
+        
+        total_memory=$((total_memory + memory_limit_bytes))
+    done <<< "${pods}"
+    
+    log_debug "Total pod memory limits: ${total_memory} bytes"
+    
+    echo "${total_memory}"
+}
+
+#==============================================================================
+# SECTION 3: UNIT CONVERSION FUNCTIONS
+#==============================================================================
+
+# Converts CPU to millicores (handles "2", "2000m", "2.5" formats)
+#
+# Arguments:
+#   $1 - CPU value (e.g., "2", "2000m", "2.5", "0.5")
+#
+# Outputs:
+#   Millicores as integer
+convert_cpu_to_millicores() {
+    local cpu="${1:?CPU value required}"
+    
+    # Handle empty or "0"
+    if [[ -z "${cpu}" || "${cpu}" == "0" ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    # If already in millicores (ends with 'm')
+    if [[ "${cpu}" =~ ^([0-9]+)m$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return 0
+    fi
+    
+    # If in cores (decimal or integer)
+    if [[ "${cpu}" =~ ^[0-9.]+$ ]]; then
+        # Use bc for floating point math
+        local millicores
+        millicores=$(echo "${cpu} * 1000" | bc | cut -d. -f1)
+        echo "${millicores}"
+        return 0
+    fi
+    
+    # Unknown format
+    log_warn "Unknown CPU format: ${cpu}, assuming 0"
+    echo "0"
+}
+
+# Converts CPU millicores to cores (for human-readable output)
+#
+# Arguments:
+#   $1 - Millicores (integer)
+#
+# Outputs:
+#   Cores as decimal (e.g., "2.5")
+convert_cpu_to_cores() {
+    local millicores="${1:?Millicores required}"
+    
+    if [[ ${millicores} -eq 0 ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    # Use bc for floating point division
+    echo "scale=3; ${millicores} / 1000" | bc
+}
+
+# Converts memory to bytes (handles Ki/Mi/Gi/Ti formats)
+#
+# Arguments:
+#   $1 - Memory value (e.g., "512Mi", "2Gi", "1024", "1.5Gi")
+#
+# Outputs:
+#   Bytes as integer
+convert_memory_to_bytes() {
+    local memory="${1:?Memory value required}"
+    
+    # Handle empty or "0"
+    if [[ -z "${memory}" || "${memory}" == "0" ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    # Parse value and unit
+    if [[ "${memory}" =~ ^([0-9.]+)([KMGT]i?)$ ]]; then
+        local value="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2]}"
+        
+        local multiplier=1
+        case "${unit}" in
+            K|Ki)
+                multiplier=1024
+                ;;
+            M|Mi)
+                multiplier=$((1024 * 1024))
+                ;;
+            G|Gi)
+                multiplier=$((1024 * 1024 * 1024))
+                ;;
+            T|Ti)
+                multiplier=$((1024 * 1024 * 1024 * 1024))
+                ;;
+        esac
+        
+        # Use bc for floating point math
+        local bytes
+        bytes=$(echo "${value} * ${multiplier}" | bc | cut -d. -f1)
+        echo "${bytes}"
+        return 0
+    fi
+    
+    # If just a number (assume bytes)
+    if [[ "${memory}" =~ ^[0-9]+$ ]]; then
+        echo "${memory}"
+        return 0
+    fi
+    
+    # Unknown format
+    log_warn "Unknown memory format: ${memory}, assuming 0"
+    echo "0"
+}
+
+# Converts bytes to human-readable format (e.g., "10Gi")
+#
+# Arguments:
+#   $1 - Bytes (integer)
+#
+# Outputs:
+#   Human-readable memory (e.g., "10Gi", "512Mi")
+convert_bytes_to_human() {
+    local bytes="${1:?Bytes required}"
+    
+    if [[ ${bytes} -eq 0 ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    local units=("" "Ki" "Mi" "Gi" "Ti")
+    local unit_index=0
+    local value=${bytes}
+    
+    while [[ ${value} -ge 1024 && ${unit_index} -lt 4 ]]; do
+        value=$((value / 1024))
+        unit_index=$((unit_index + 1))
+    done
+    
+    echo "${value}${units[${unit_index}]}"
+}
+
+# Generic Kubernetes quantity parser (supports CPU and memory)
+#
+# Arguments:
+#   $1 - Quantity (e.g., "2", "2000m", "512Mi")
+#   $2 - Type ("cpu" or "memory")
+#
+# Outputs:
+#   Base units (millicores for CPU, bytes for memory)
+parse_k8s_quantity() {
+    local quantity="${1:?Quantity required}"
+    local type="${2:?Type required (cpu or memory)}"
+    
+    case "${type}" in
+        cpu)
+            convert_cpu_to_millicores "${quantity}"
+            ;;
+        memory)
+            convert_memory_to_bytes "${quantity}"
+            ;;
+        *)
+            log_error "Unknown quantity type: ${type}"
+            echo "0"
+            return 1
+            ;;
+    esac
+}
+
+#==============================================================================
+# SECTION 4: DAEMONSET MAX CAPACITY FUNCTIONS
+#==============================================================================
+
+# Gets maximum node capacity using 4-tier detection
+#
+# Tier 1: Karpenter NodePool limits
+# Tier 2: Cloud provider autoscaler (AWS ASG, GCP MIG, Azure VMSS)
+# Tier 3: ConfigMap override (forge-cluster-config)
+# Tier 4: Fallback (current nodes × 2)
+#
+# Arguments:
+#   $1 - Namespace (optional, for future node selector support)
+#
+# Outputs:
+#   Maximum number of nodes
+get_max_node_capacity() {
+    local namespace="${1:-}"
+    
+    log_debug "Detecting maximum node capacity..."
+    
+    # Tier 1: Karpenter NodePool
+    local karpenter_max
+    karpenter_max=$(get_karpenter_max_nodes)
+    
+    if [[ -n "${karpenter_max}" && ${karpenter_max} -gt 0 ]]; then
+        log_info "Using Karpenter max nodes: ${karpenter_max}"
+        echo "${karpenter_max}"
+        return 0
+    fi
+    
+    # Tier 2: Cloud provider autoscaler
+    local autoscaler_max
+    autoscaler_max=$(get_autoscaler_max_nodes)
+    
+    if [[ -n "${autoscaler_max}" && ${autoscaler_max} -gt 0 ]]; then
+        log_info "Using autoscaler max nodes: ${autoscaler_max}"
+        echo "${autoscaler_max}"
+        return 0
+    fi
+    
+    # Tier 3: ConfigMap override
+    local configmap_max
+    configmap_max=$(kubectl get configmap forge-cluster-config -n forge-system \
+        -o jsonpath='{.data.max-nodes}' 2>/dev/null || echo "")
+    
+    if [[ -n "${configmap_max}" && ${configmap_max} -gt 0 ]]; then
+        log_info "Using ConfigMap max nodes: ${configmap_max}"
+        echo "${configmap_max}"
+        return 0
+    fi
+    
+    # Tier 4: Fallback (current nodes × 2)
+    local current_nodes
+    current_nodes=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    
+    if [[ ${current_nodes} -eq 0 ]]; then
+        log_warn "No nodes found in cluster, using default: 10"
+        echo "10"
+        return 0
+    fi
+    
+    local fallback_max=$((current_nodes * 2))
+    log_warn "Using fallback max nodes (current × 2): ${fallback_max}"
+    echo "${fallback_max}"
+}
+
+# Gets Karpenter NodePool max nodes
+#
+# Outputs:
+#   Max nodes from NodePool, or empty string if not found
+get_karpenter_max_nodes() {
+    log_debug "Checking Karpenter NodePool for max nodes..."
+    
+    # Check if Karpenter CRDs exist
+    if ! kubectl get crd nodepools.karpenter.sh &>/dev/null; then
+        log_debug "Karpenter NodePool CRD not found"
+        return 0
+    fi
+    
+    # Get all NodePools
+    local nodepools
+    nodepools=$(kubectl get nodepool -o json 2>/dev/null | jq -r '.items[].metadata.name' || echo "")
+    
+    if [[ -z "${nodepools}" ]]; then
+        log_debug "No Karpenter NodePools found"
+        return 0
+    fi
+    
+    # Sum max nodes from all NodePools
+    local total_max=0
+    while IFS= read -r nodepool_name; do
+        [[ -z "${nodepool_name}" ]] && continue
+        
+        local max_nodes
+        max_nodes=$(kubectl get nodepool "${nodepool_name}" \
+            -o jsonpath='{.spec.limits.resources.nodes}' 2>/dev/null || echo "")
+        
+        if [[ -n "${max_nodes}" && ${max_nodes} -gt 0 ]]; then
+            log_debug "NodePool ${nodepool_name}: max ${max_nodes} nodes"
+            total_max=$((total_max + max_nodes))
+        fi
+    done <<< "${nodepools}"
+    
+    if [[ ${total_max} -gt 0 ]]; then
+        echo "${total_max}"
+    fi
+}
+
+# Gets autoscaler max nodes from cloud provider
+#
+# Supports: AWS (ASG), GCP (MIG), Azure (VMSS)
+#
+# Outputs:
+#   Max nodes from autoscaler, or empty string if not found
+get_autoscaler_max_nodes() {
+    log_debug "Checking cloud provider autoscaler for max nodes..."
+    
+    # Detect cloud provider from node labels
+    local cloud_provider
+    cloud_provider=$(kubectl get nodes -o json 2>/dev/null | \
+        jq -r '.items[0].metadata.labels["node.kubernetes.io/instance-type"]' || echo "")
+    
+    if [[ -z "${cloud_provider}" ]]; then
+        log_debug "Cannot detect cloud provider"
+        return 0
+    fi
+    
+    # AWS: Check ASG tags on nodes
+    if kubectl get nodes -o json 2>/dev/null | grep -q "eks.amazonaws.com"; then
+        local asg_name
+        asg_name=$(kubectl get nodes -o json 2>/dev/null | \
+            jq -r '.items[0].spec.providerID' | cut -d'/' -f5 || echo "")
+        
+        if [[ -n "${asg_name}" ]]; then
+            # TODO: Implement AWS CLI call to get ASG maxSize
+            # For now, skip (requires AWS CLI and permissions)
+            log_debug "AWS ASG detected but AWS CLI integration not implemented"
+        fi
+    fi
+    
+    # GCP: Check MIG
+    if kubectl get nodes -o json 2>/dev/null | grep -q "gke.io"; then
+        log_debug "GCP GKE detected but gcloud CLI integration not implemented"
+    fi
+    
+    # Azure: Check VMSS
+    if kubectl get nodes -o json 2>/dev/null | grep -q "azure.com"; then
+        log_debug "Azure AKS detected but az CLI integration not implemented"
+    fi
+    
+    # Not implemented for this cloud provider
+    return 0
+}
+
+# Applies a percentage buffer to a value
+#
+# Arguments:
+#   $1 - Base value (integer)
+#   $2 - Buffer percent (e.g., 20 for 20%)
+#
+# Outputs:
+#   Value with buffer applied
+apply_buffer() {
+    local base_value="${1:?Base value required}"
+    local buffer_percent="${2:?Buffer percent required}"
+    
+    if [[ ${base_value} -eq 0 ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    # Calculate buffer: base_value * (1 + buffer_percent/100)
+    local multiplier=$((100 + buffer_percent))
+    local result=$((base_value * multiplier / 100))
+    
+    echo "${result}"
+}
+
+#==============================================================================
+# SECTION 5: QUOTA/POLICY/VAULT OPERATIONS
+#==============================================================================
+
+# Applies ResourceQuota to a namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - CPU limit (millicores, e.g., "6000")
+#   $3 - Memory limit (bytes, e.g., "12884901888")
+#   $4 - Pods limit (e.g., "30")
+#
+# Returns:
+#   0 on success, 1 on failure
+apply_resource_quota() {
+    local namespace="${1:?Namespace name required}"
+    local cpu_millicores="${2:?CPU millicores required}"
+    local memory_bytes="${3:?Memory bytes required}"
+    local pods="${4:?Pods limit required}"
+    
+    log_info "Applying ResourceQuota to namespace '${namespace}'..."
+    
+    # Convert to Kubernetes format
+    local cpu_limit="${cpu_millicores}m"
+    local memory_limit
+    memory_limit=$(convert_bytes_to_human "${memory_bytes}")
+    
+    log_debug "Quota: CPU=${cpu_limit}, Memory=${memory_limit}, Pods=${pods}"
+    
+    # Create ResourceQuota manifest
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-quota
+  namespace: ${namespace}
+  labels:
+    ${LABEL_PREFIX}/managed: "true"
+spec:
+  hard:
+    limits.cpu: "${cpu_limit}"
+    limits.memory: "${memory_limit}"
+    pods: "${pods}"
+EOF
+    
+    if [[ $? -eq 0 ]]; then
+        log_success "ResourceQuota applied successfully"
+        return 0
+    else
+        log_error "Failed to apply ResourceQuota"
+        return 1
+    fi
+}
+
+# Removes ResourceQuota from a namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 on success, 1 on failure
+remove_resource_quota() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_info "Removing ResourceQuota from namespace '${namespace}'..."
+    
+    kubectl delete resourcequota namespace-quota -n "${namespace}" --ignore-not-found
+}
+
+# Backs up ResourceQuota to a file
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Backup file path
+#
+# Returns:
+#   0 on success, 1 on failure
+backup_resource_quota() {
+    local namespace="${1:?Namespace name required}"
+    local backup_file="${2:?Backup file required}"
+    
+    log_info "Backing up ResourceQuota from namespace '${namespace}' to '${backup_file}'..."
+    
+    kubectl get resourcequota namespace-quota -n "${namespace}" -o yaml > "${backup_file}" 2>/dev/null
+}
+
+# Verifies ResourceQuota exists and matches expected values
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Expected CPU millicores
+#   $3 - Expected memory bytes
+#   $4 - Expected pods
+#
+# Returns:
+#   0 if matches, 1 if mismatch or missing
+verify_resource_quota() {
+    local namespace="${1:?Namespace name required}"
+    local expected_cpu_millicores="${2:?Expected CPU required}"
+    local expected_memory_bytes="${3:?Expected memory required}"
+    local expected_pods="${4:?Expected pods required}"
+    
+    log_debug "Verifying ResourceQuota in namespace '${namespace}'..."
+    
+    # Check if quota exists
+    if ! kubectl get resourcequota namespace-quota -n "${namespace}" &>/dev/null; then
+        log_error "ResourceQuota 'namespace-quota' not found in namespace '${namespace}'"
+        return 1
+    fi
+    
+    # Get current quota values
+    local current_cpu current_memory current_pods
+    current_cpu=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.limits\.cpu}' 2>/dev/null || echo "")
+    current_memory=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.limits\.memory}' 2>/dev/null || echo "")
+    current_pods=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.pods}' 2>/dev/null || echo "")
+    
+    # Convert to base units for comparison
+    local current_cpu_millicores current_memory_bytes
+    current_cpu_millicores=$(convert_cpu_to_millicores "${current_cpu}")
+    current_memory_bytes=$(convert_memory_to_bytes "${current_memory}")
+    
+    # Compare (allow 5% tolerance for rounding)
+    local cpu_diff=$((expected_cpu_millicores - current_cpu_millicores))
+    cpu_diff=${cpu_diff#-}  # abs value
+    local cpu_tolerance=$((expected_cpu_millicores / 20))  # 5%
+    
+    local memory_diff=$((expected_memory_bytes - current_memory_bytes))
+    memory_diff=${memory_diff#-}
+    local memory_tolerance=$((expected_memory_bytes / 20))
+    
+    if [[ ${cpu_diff} -gt ${cpu_tolerance} ]]; then
+        log_error "CPU quota mismatch: expected ${expected_cpu_millicores}m, got ${current_cpu_millicores}m"
+        return 1
+    fi
+    
+    if [[ ${memory_diff} -gt ${memory_tolerance} ]]; then
+        log_error "Memory quota mismatch: expected ${expected_memory_bytes} bytes, got ${current_memory_bytes} bytes"
+        return 1
+    fi
+    
+    if [[ ${current_pods} -ne ${expected_pods} ]]; then
+        log_error "Pods quota mismatch: expected ${expected_pods}, got ${current_pods}"
+        return 1
+    fi
+    
+    log_debug "ResourceQuota verification passed"
+    return 0
+}
+
+# Gets current quota usage (percent)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   JSON with usage percentages:
+#   {
+#     "cpu_percent": 75,
+#     "memory_percent": 80,
+#     "pods_percent": 60
+#   }
+get_quota_usage() {
+    local namespace="${1:?Namespace name required}"
+    
+    if ! kubectl get resourcequota namespace-quota -n "${namespace}" &>/dev/null; then
+        echo '{"cpu_percent": 0, "memory_percent": 0, "pods_percent": 0}'
+        return 1
+    fi
+    
+    # Get hard and used values
+    local cpu_hard cpu_used memory_hard memory_used pods_hard pods_used
+    cpu_hard=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.limits\.cpu}' 2>/dev/null || echo "0")
+    cpu_used=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.status.used.limits\.cpu}' 2>/dev/null || echo "0")
+    memory_hard=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.limits\.memory}' 2>/dev/null || echo "0")
+    memory_used=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.status.used.limits\.memory}' 2>/dev/null || echo "0")
+    pods_hard=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.spec.hard.pods}' 2>/dev/null || echo "0")
+    pods_used=$(kubectl get resourcequota namespace-quota -n "${namespace}" \
+        -o jsonpath='{.status.used.pods}' 2>/dev/null || echo "0")
+    
+    # Convert to base units
+    local cpu_hard_mc cpu_used_mc memory_hard_bytes memory_used_bytes
+    cpu_hard_mc=$(convert_cpu_to_millicores "${cpu_hard}")
+    cpu_used_mc=$(convert_cpu_to_millicores "${cpu_used}")
+    memory_hard_bytes=$(convert_memory_to_bytes "${memory_hard}")
+    memory_used_bytes=$(convert_memory_to_bytes "${memory_used}")
+    
+    # Calculate percentages
+    local cpu_percent=0 memory_percent=0 pods_percent=0
+    
+    if [[ ${cpu_hard_mc} -gt 0 ]]; then
+        cpu_percent=$((cpu_used_mc * 100 / cpu_hard_mc))
+    fi
+    
+    if [[ ${memory_hard_bytes} -gt 0 ]]; then
+        memory_percent=$((memory_used_bytes * 100 / memory_hard_bytes))
+    fi
+    
+    if [[ ${pods_hard} -gt 0 ]]; then
+        pods_percent=$((pods_used * 100 / pods_hard))
+    fi
+    
+    cat <<EOF
+{
+  "cpu_percent": ${cpu_percent},
+  "memory_percent": ${memory_percent},
+  "pods_percent": ${pods_percent}
+}
+EOF
+}
+
+# Applies NetworkPolicy to a namespace based on type
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Namespace type
+#
+# Returns:
+#   0 on success, 1 on failure
+apply_network_policy() {
+    local namespace="${1:?Namespace name required}"
+    local ns_type="${2:?Namespace type required}"
+    
+    log_info "Applying NetworkPolicy to namespace '${namespace}' (type: ${ns_type})..."
+    
+    local policy_template
+    policy_template=$(get_namespace_network_policy "${ns_type}")
+    
+    if [[ -z "${policy_template}" ]]; then
+        log_warn "No NetworkPolicy template for type '${ns_type}', skipping"
+        return 0
+    fi
+    
+    # Apply policy
+    echo "${policy_template}" | sed "s/NAMESPACE_NAME/${namespace}/g" | kubectl apply -f -
+    
+    if [[ $? -eq 0 ]]; then
+        log_success "NetworkPolicy applied successfully"
+        return 0
+    else
+        log_error "Failed to apply NetworkPolicy"
+        return 1
+    fi
+}
+
+# Removes NetworkPolicy from a namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 on success
+remove_network_policy() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_info "Removing NetworkPolicy from namespace '${namespace}'..."
+    
+    kubectl delete networkpolicy default-deny -n "${namespace}" --ignore-not-found
+}
+
+# Gets NetworkPolicy template for a namespace type
+#
+# Arguments:
+#   $1 - Namespace type
+#
+# Outputs:
+#   NetworkPolicy YAML template
+get_namespace_network_policy() {
+    local ns_type="${1:?Namespace type required}"
+    
+    case "${ns_type}" in
+        application|middleware|forge-jobs)
+            # Default deny, allow within namespace + DNS
+            cat <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: NAMESPACE_NAME
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+EOF
+            ;;
+        forge-operator)
+            # Allow API server access
+            cat <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: NAMESPACE_NAME
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+EOF
+            ;;
+        *)
+            # No policy for system namespaces
+            echo ""
+            ;;
+    esac
+}
+
+# Creates Vault bundle for namespace (if type=application)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 on success, 1 on failure
+create_vault_bundle() {
+    local namespace="${1:?Namespace name required}"
+    
+    local ns_type
+    ns_type=$(get_namespace_type "${namespace}")
+    
+    if [[ "${ns_type}" != "application" ]]; then
+        log_debug "Namespace type '${ns_type}' does not require Vault bundle, skipping"
+        return 0
+    fi
+    
+    log_info "Creating Vault bundle for namespace '${namespace}'..."
+    
+    # TODO: Implement Vault integration
+    # For now, just log
+    log_warn "Vault integration not yet implemented"
+    
+    return 0
+}
+
+# Deletes Vault bundle for namespace
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 on success
+delete_vault_bundle() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_info "Deleting Vault bundle for namespace '${namespace}'..."
+    
+    # TODO: Implement Vault cleanup
+    log_warn "Vault cleanup not yet implemented"
+    
+    return 0
+}
+
+#==============================================================================
+# SECTION 6: VERIFICATION FUNCTIONS
+#==============================================================================
+
+# Verifies complete namespace hardening compliance
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Outputs:
+#   JSON compliance report
+#
+# Returns:
+#   0 if compliant, 1 if violations found
+verify_namespace_hardening() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_info "Verifying namespace hardening for '${namespace}'..."
+    
+    local is_compliant=true
+    local violations=()
+    local warnings=()
+    
+    # Check if namespace is managed
+    local managed
+    managed=$(get_namespace_label "${namespace}" "managed")
+    
+    if [[ "${managed}" != "true" ]]; then
+        violations+=("Namespace is not managed by Forge (moai.forge.io/managed != true)")
+        is_compliant=false
+    fi
+    
+    # Check hardening status
+    local hardened
+    hardened=$(get_namespace_label "${namespace}" "hardened")
+    
+    if [[ "${hardened}" != "true" ]]; then
+        violations+=("Namespace is not hardened (moai.forge.io/hardened != true)")
+        is_compliant=false
+    fi
+    
+    # Check PSS labels
+    local pss_enforce
+    pss_enforce=$(kubectl get namespace "${namespace}" \
+        -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}' 2>/dev/null || echo "")
+    
+    if [[ "${pss_enforce}" != "restricted" && "${pss_enforce}" != "baseline" ]]; then
+        violations+=("PSS enforce label missing or invalid (expected: restricted or baseline, got: ${pss_enforce})")
+        is_compliant=false
+    fi
+    
+    # Check ResourceQuota
+    if ! kubectl get resourcequota namespace-quota -n "${namespace}" &>/dev/null; then
+        violations+=("ResourceQuota 'namespace-quota' not found")
+        is_compliant=false
+    else
+        # Check quota usage
+        local quota_usage
+        quota_usage=$(get_quota_usage "${namespace}")
+        local cpu_percent memory_percent pods_percent
+        cpu_percent=$(echo "${quota_usage}" | jq -r '.cpu_percent')
+        memory_percent=$(echo "${quota_usage}" | jq -r '.memory_percent')
+        pods_percent=$(echo "${quota_usage}" | jq -r '.pods_percent')
+        
+        if [[ ${cpu_percent} -gt 80 ]]; then
+            warnings+=("CPU quota usage is high: ${cpu_percent}%")
+        fi
+        
+        if [[ ${memory_percent} -gt 80 ]]; then
+            warnings+=("Memory quota usage is high: ${memory_percent}%")
+        fi
+        
+        if [[ ${pods_percent} -gt 80 ]]; then
+            warnings+=("Pods quota usage is high: ${pods_percent}%")
+        fi
+    fi
+    
+    # Check NetworkPolicy
+    if ! kubectl get networkpolicy default-deny -n "${namespace}" &>/dev/null; then
+        local ns_type
+        ns_type=$(get_namespace_type "${namespace}")
+        
+        # Only application/middleware/forge-jobs types require NetworkPolicy
+        if [[ "${ns_type}" == "application" || "${ns_type}" == "middleware" || "${ns_type}" == "forge-jobs" ]]; then
+            violations+=("NetworkPolicy 'default-deny' not found")
+            is_compliant=false
+        fi
+    fi
+    
+    # Build JSON report
+    local violations_json warnings_json
+    violations_json=$(printf '%s\n' "${violations[@]}" | jq -R . | jq -s .)
+    warnings_json=$(printf '%s\n' "${warnings[@]}" | jq -R . | jq -s .)
+    
+    local status="compliant"
+    if [[ "${is_compliant}" == "false" ]]; then
+        status="non-compliant"
+    elif [[ ${#warnings[@]} -gt 0 ]]; then
+        status="warning"
+    fi
+    
+    cat <<EOF
+{
+  "namespace": "${namespace}",
+  "status": "${status}",
+  "compliant": ${is_compliant},
+  "violations": ${violations_json},
+  "warnings": ${warnings_json},
+  "checked_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+    
+    if [[ "${is_compliant}" == "true" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Checks PSS labels
+#
+# Arguments:
+#   $1 - Namespace name
+#   $2 - Expected PSS level (restricted, baseline, privileged)
+#
+# Returns:
+#   0 if correct, 1 if mismatch
+check_pss_labels() {
+    local namespace="${1:?Namespace name required}"
+    local expected_level="${2:?Expected PSS level required}"
+    
+    local pss_enforce pss_audit pss_warn
+    pss_enforce=$(kubectl get namespace "${namespace}" \
+        -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}' 2>/dev/null || echo "")
+    pss_audit=$(kubectl get namespace "${namespace}" \
+        -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/audit}' 2>/dev/null || echo "")
+    pss_warn=$(kubectl get namespace "${namespace}" \
+        -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/warn}' 2>/dev/null || echo "")
+    
+    if [[ "${pss_enforce}" == "${expected_level}" && \
+          "${pss_audit}" == "${expected_level}" && \
+          "${pss_warn}" == "${expected_level}" ]]; then
+        return 0
+    else
+        log_error "PSS labels mismatch: expected ${expected_level}, got enforce=${pss_enforce}, audit=${pss_audit}, warn=${pss_warn}"
+        return 1
+    fi
+}
+
+# Checks quota compliance (not exceeding limits)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 if compliant, 1 if exceeded
+check_quota_compliance() {
+    local namespace="${1:?Namespace name required}"
+    
+    local quota_usage
+    quota_usage=$(get_quota_usage "${namespace}")
+    
+    local cpu_percent memory_percent pods_percent
+    cpu_percent=$(echo "${quota_usage}" | jq -r '.cpu_percent')
+    memory_percent=$(echo "${quota_usage}" | jq -r '.memory_percent')
+    pods_percent=$(echo "${quota_usage}" | jq -r '.pods_percent')
+    
+    if [[ ${cpu_percent} -ge 100 || ${memory_percent} -ge 100 || ${pods_percent} -ge 100 ]]; then
+        log_error "Quota exceeded: CPU=${cpu_percent}%, Memory=${memory_percent}%, Pods=${pods_percent}%"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Detects hardening drift (resources deleted/modified)
+#
+# Arguments:
+#   $1 - Namespace name
+#
+# Returns:
+#   0 if no drift, 1 if drift detected
+detect_hardening_drift() {
+    local namespace="${1:?Namespace name required}"
+    
+    log_debug "Detecting hardening drift in namespace '${namespace}'..."
+    
+    local drift_detected=false
+    
+    # Check if namespace is marked as hardened
+    if ! is_namespace_hardened "${namespace}"; then
+        log_debug "Namespace not hardened, no drift check needed"
+        return 0
+    fi
+    
+    # Check ResourceQuota
+    if ! kubectl get resourcequota namespace-quota -n "${namespace}" &>/dev/null; then
+        log_error "Drift detected: ResourceQuota 'namespace-quota' missing"
+        drift_detected=true
+    else
+        # Verify quota matches labels
+        local expected_cpu expected_memory expected_pods
+        expected_cpu=$(get_namespace_label "${namespace}" "quota-cpu-limit")
+        expected_memory=$(get_namespace_label "${namespace}" "quota-memory-limit")
+        expected_pods=$(get_namespace_label "${namespace}" "quota-pods-limit")
+        
+        if [[ -n "${expected_cpu}" ]]; then
+            local expected_cpu_mc
+            expected_cpu_mc=$(convert_cpu_to_millicores "${expected_cpu}")
+            
+            if ! verify_resource_quota "${namespace}" "${expected_cpu_mc}" \
+                "$(convert_memory_to_bytes "${expected_memory}")" "${expected_pods}"; then
+                log_error "Drift detected: ResourceQuota values do not match labels"
+                drift_detected=true
+            fi
+        fi
+    fi
+    
+    # Check NetworkPolicy
+    local ns_type
+    ns_type=$(get_namespace_type "${namespace}")
+    
+    if [[ "${ns_type}" == "application" || "${ns_type}" == "middleware" || "${ns_type}" == "forge-jobs" ]]; then
+        if ! kubectl get networkpolicy default-deny -n "${namespace}" &>/dev/null; then
+            log_error "Drift detected: NetworkPolicy 'default-deny' missing"
+            drift_detected=true
+        fi
+    fi
+    
+    if [[ "${drift_detected}" == "true" ]]; then
+        return 1
+    else
+        log_debug "No drift detected"
+        return 0
+    fi
+}
+
+# Generates compliance report
+#
+# Arguments:
+#   $1 - Namespace name (or "all" for all managed namespaces)
+#   $2 - Output file path (optional, defaults to stdout)
+#
+# Returns:
+#   0 on success
+generate_compliance_report() {
+    local namespace="${1:?Namespace name or 'all' required}"
+    local output_file="${2:-}"
+    
+    local report=""
+    
+    if [[ "${namespace}" == "all" ]]; then
+        # Get all managed namespaces
+        local managed_namespaces
+        managed_namespaces=$(kubectl get namespaces \
+            -l "${LABEL_PREFIX}/managed=true" \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+        
+        if [[ -z "${managed_namespaces}" ]]; then
+            log_warn "No managed namespaces found"
+            echo '{"namespaces": []}'
+            return 0
+        fi
+        
+        local reports=()
+        for ns in ${managed_namespaces}; do
+            local ns_report
+            ns_report=$(verify_namespace_hardening "${ns}")
+            reports+=("${ns_report}")
+        done
+        
+        # Combine reports
+        report=$(printf '%s\n' "${reports[@]}" | jq -s '{namespaces: .}')
+    else
+        report=$(verify_namespace_hardening "${namespace}")
+    fi
+    
+    if [[ -n "${output_file}" ]]; then
+        echo "${report}" > "${output_file}"
+        log_success "Compliance report written to '${output_file}'"
+    else
+        echo "${report}"
+    fi
+    
+    return 0
+}
+
+#==============================================================================
+# LIBRARY LOADED
+#==============================================================================
+
+log_debug "forge-namespace-operations.sh library loaded (v2.0.0)"
