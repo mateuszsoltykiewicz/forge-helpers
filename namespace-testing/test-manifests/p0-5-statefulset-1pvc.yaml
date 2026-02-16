@@ -1,0 +1,62 @@
+# Test P0.5: StatefulSet (replicas=3, 1 volumeClaimTemplate)
+# Expected results:
+#   - Pods: 3
+#   - PVCs: 3 (3 replicas × 1 template)
+#   - CPU: 1800m (500m × 3 × 1.2 buffer)
+#   - Memory: 1843Mi (512Mi × 3 × 1.2 buffer)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-sts-1pvc
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app
+  namespace: test-sts-1pvc
+spec:
+  clusterIP: None
+  selector:
+    app: test-app
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-app
+  namespace: test-sts-1pvc
+spec:
+  serviceName: test-app
+  replicas: 3
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi

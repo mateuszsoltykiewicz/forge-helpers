@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-p1-multicontainer
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container
+  namespace: ns-p1-multicontainer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: multi-container
+  template:
+    metadata:
+      labels:
+        app: multi-container
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sidecar
+          image: busybox
+          command: ["/bin/sh", "-c", "sleep 3600"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+        - name: main
+          image: nginx:1.21
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+            requests:
+              cpu: "150m"
+              memory: "128Mi"

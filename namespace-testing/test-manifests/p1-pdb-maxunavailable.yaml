@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-p1-pdb-maxunav
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-pdb-maxunav
+  namespace: ns-p1-pdb-maxunav
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: deploy-pdb-maxunav
+  template:
+    metadata:
+      labels:
+        app: deploy-pdb-maxunav
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.21
+          resources:
+            limits:
+              cpu: "150m"
+              memory: "192Mi"
+---
+# PDB with maxUnavailable instead of minAvailable
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pdb-maxunav
+  namespace: ns-p1-pdb-maxunav
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: deploy-pdb-maxunav

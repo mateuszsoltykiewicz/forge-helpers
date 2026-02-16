@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-p1-keda
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-keda
+  namespace: ns-p1-keda
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-keda
+  template:
+    metadata:
+      labels:
+        app: nginx-keda
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.21
+          resources:
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+---
+# This ScaledObject expects KEDA to be installed. It uses the cpu scaler and sets maxReplicaCount.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scaled-nginx
+  namespace: ns-p1-keda
+spec:
+  scaleTargetRef:
+    name: nginx-keda
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers:
+    - type: cpu
+      metadata:
+        type: Utilization
+        value: "50"

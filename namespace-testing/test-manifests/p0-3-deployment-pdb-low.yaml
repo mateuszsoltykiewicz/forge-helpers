@@ -1,0 +1,51 @@
+# Test P0.3: Deployment + PDB (minAvailable < replicas)
+# Expected results:
+#   - Pods: 5 (no +1 because PDB minAvailable=1 < replicas=5)
+#   - PVCs: 0
+#   - CPU: 3000m (500m × 5 × 1.2 buffer)
+#   - Memory: 3072Mi (512Mi × 5 × 1.2 buffer)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-pdb-low
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: test-pdb-low
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-app-pdb
+  namespace: test-pdb-low
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: test-app
