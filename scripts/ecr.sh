@@ -1,10 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Generic AWS ECR Repository Management Script
 # ==============================================================================
 # Description: Creates/deletes ECR repositories with policies and lifecycle rules
-# Version: 2.0.0
+# Version: 3.0.0
 # Compatible: bash 3.2+ (macOS compatible)
+#
+# Library Dependencies:
+# - forge-core.sh (logging, validation)
+# - forge-patterns.sh (naming conventions, IAM role naming)
+# - forge-aws-discovery.sh (AWS account, region, EKS discovery)
+# - forge-ecr-operations.sh (ECR operations, policy generation with Docker Builder)
 #
 # Usage:
 #   ./ecr.sh --customer CUSTOMER --project PROJECT --service-name SERVICE \
@@ -35,15 +41,25 @@ set -euo pipefail
 # Script Configuration
 # ==============================================================================
 
-readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_VERSION="3.0.0"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly LIB_DIR="${SCRIPT_DIR}/../lib"
+
+# ==============================================================================
+# Source Forge Libraries
+# ==============================================================================
+
+source "${LIB_DIR}/forge-core.sh"
+source "${LIB_DIR}/forge-patterns.sh"
+source "${LIB_DIR}/forge-aws-discovery.sh"
+source "${LIB_DIR}/forge-ecr-operations.sh"
 
 # Default configuration
 DEFAULT_AWS_REGION="eu-central-1"
 
 # ==============================================================================
-# Color Codes
+# Color Codes (kept for banner compatibility)
 # ==============================================================================
 
 readonly RED='\033[0;31m'
@@ -93,44 +109,6 @@ declare -a DELETED_REPOS=()
 declare -a FAILED_REPOS=()
 
 # ==============================================================================
-# Logging Functions
-# ==============================================================================
-
-log_info() {
-  echo -e "${BLUE}[INFO]${NC}  $*"
-}
-
-log_success() {
-  echo -e "${GREEN}[✓]${NC}     $*"
-}
-
-log_warning() {
-  echo -e "${YELLOW}[WARN]${NC}  $*"
-}
-
-log_error() {
-  echo -e "${RED}[ERROR]${NC} $*" >&2
-}
-
-log_debug() {
-  if [ "$VERBOSE" = true ]; then
-    echo -e "${MAGENTA}[DEBUG]${NC} $*"
-  fi
-}
-
-log_dry_run() {
-  echo -e "${CYAN}[DRY]${NC}   $*"
-}
-
-log_step() {
-  echo ""
-  echo -e "${CYAN}========================================${NC}"
-  echo -e "${BOLD}$*${NC}"
-  echo -e "${CYAN}========================================${NC}"
-  echo ""
-}
-
-# ==============================================================================
 # Helper Functions
 # ==============================================================================
 
@@ -139,7 +117,7 @@ print_banner() {
   cat << 'EOF'
 ╔══════════════════════════════════════════════════════════════╗
 ║         Generic AWS ECR Repository Management Script         ║
-║                       Version 2.0.0                          ║
+║                       Version 3.0.0                          ║
 ╚══════════════════════════════════════════════════════════════╝
 EOF
   echo -e "${NC}"
@@ -314,25 +292,23 @@ parse_arguments() {
 # ==============================================================================
 # Validation Functions
 # ==============================================================================
+# Using functions from forge-core.sh:
+# - validate_required_commands() - Check for required tools
+# ==============================================================================
 
 validate_prerequisites() {
   log_debug "Validating prerequisites..."
 
-  # Check for required tools
-  local missing_tools=()
+  # Check for required tools using forge-core
+  validate_required_commands "aws" || {
+    log_error "Missing required tool: aws"
+    log_error "Please install AWS CLI and try again"
+    exit 1
+  }
 
-  if ! command -v aws &> /dev/null; then
-    missing_tools+=("aws")
-  fi
-
+  # Optional tool check
   if ! command -v jq &> /dev/null; then
     log_warning "jq not found (optional, used for JSON formatting)"
-  fi
-
-  if [ ${#missing_tools[@]} -gt 0 ]; then
-    log_error "Missing required tools: ${missing_tools[*]}"
-    log_error "Please install missing tools and try again"
-    exit 1
   fi
 
   log_debug "All required tools found"
@@ -385,162 +361,10 @@ configure_aws_cli() {
 }
 
 # ==============================================================================
-# Naming Convention Functions
-# ==============================================================================
-
-get_ecr_repository_name() {
-  local customer="$1"
-  local project="$2"
-  local env="$3"
-  local service="$4"
-  echo "${customer}/${project}/${env}/${service}"
-}
-
-# ==============================================================================
-# AWS Helper Functions
-# ==============================================================================
-
-get_aws_account_id() {
-  log_debug "Retrieving AWS account ID..."
-  
-  local account_id
-  account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
-  
-  if [ -z "$account_id" ]; then
-    log_error "Failed to retrieve AWS account ID"
-    log_error "Check AWS credentials and permissions"
-    return 1
-  fi
-  
-  log_debug "AWS Account ID: $account_id"
-  echo "$account_id"
-}
-
-get_eks_cluster_arn() {
-  local cluster_name="$1"
-  local region="$2"
-  
-  log_debug "Retrieving EKS cluster ARN for: $cluster_name"
-  
-  local cluster_arn
-  cluster_arn=$(aws eks describe-cluster \
-    --name "$cluster_name" \
-    --region "$region" \
-    --query 'cluster.arn' \
-    --output text 2>/dev/null)
-  
-  if [ -z "$cluster_arn" ] || [ "$cluster_arn" = "None" ]; then
-    log_error "EKS cluster not found: $cluster_name"
-    log_error "Region: $region"
-    return 1
-  fi
-  
-  log_debug "EKS ARN: $cluster_arn"
-  echo "$cluster_arn"
-}
-
-ecr_repository_exists() {
-  local repository_name="$1"
-  
-  local aws_cmd="aws ecr describe-repositories --repository-names $repository_name --region $AWS_REGION"
-  
-  if [ -n "$AWS_PROFILE" ]; then
-    aws_cmd="$aws_cmd --profile $AWS_PROFILE"
-  fi
-  
-  eval "$aws_cmd" >/dev/null 2>&1
-}
-
-# ==============================================================================
-# Policy Generation Functions
-# ==============================================================================
-
-generate_ecr_policy() {
-  local eks_cluster_arn="$1"
-  local aws_account_id="$2"
-  
-  cat <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowEKSClusterPull",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "eks.amazonaws.com"
-      },
-      "Action": [
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "ecr:BatchCheckLayerAvailability"
-      ],
-      "Condition": {
-        "StringEquals": {
-          "aws:SourceArn": "${eks_cluster_arn}"
-        }
-      }
-    },
-    {
-      "Sid": "AllowEKSNodesPull",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "*"
-      },
-      "Action": [
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "ecr:BatchCheckLayerAvailability"
-      ],
-      "Condition": {
-        "StringLike": {
-          "aws:PrincipalArn": "arn:aws:iam::${aws_account_id}:role/eks-node-group-*"
-        }
-      }
-    },
-    {
-      "Sid": "AllowDeveloperPush",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::${aws_account_id}:root"
-      },
-      "Action": [
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:PutImage",
-        "ecr:InitiateLayerUpload",
-        "ecr:UploadLayerPart",
-        "ecr:CompleteLayerUpload"
-      ]
-    }
-  ]
-}
-EOF
-}
-
-generate_lifecycle_policy() {
-  cat <<'EOF'
-{
-  "rules": [
-    {
-      "rulePriority": 1,
-      "description": "Keep last 4 images",
-      "selection": {
-        "tagStatus": "any",
-        "countType": "imageCountMoreThan",
-        "countNumber": 4
-      },
-      "action": {
-        "type": "expire"
-      }
-    }
-  ]
-}
-EOF
-}
-
-# ==============================================================================
 # Image Operations
+# ==============================================================================
+# Note: These functions remain here as they are not yet in forge-ecr-operations.sh
+# Future enhancement: Move to library if needed
 # ==============================================================================
 
 is_digest() {
@@ -696,104 +520,16 @@ wipe_repository_images() {
 # ==============================================================================
 # ECR Repository Operations - Create
 # ==============================================================================
-
-create_ecr_repository() {
-  local repository_name="$1"
-  
-  log_info "Creating ECR repository: $repository_name"
-  
-  if [ "$DRY_RUN" = true ]; then
-    log_dry_run "Would create ECR repository: $repository_name"
-    log_dry_run "  Tag mutability: MUTABLE"
-    log_dry_run "  Scan on push: true"
-    log_dry_run "  Tags: Customer=$CUSTOMER, Project=$PROJECT, Environment=$env, Service=$SERVICE_NAME"
-    return 0
-  fi
-  
-  if aws ecr create-repository \
-    --repository-name "$repository_name" \
-    --region "$AWS_REGION" \
-    --image-tag-mutability MUTABLE \
-    --image-scanning-configuration scanOnPush=true \
-    --tags Key=Customer,Value="$CUSTOMER" \
-           Key=Project,Value="$PROJECT" \
-           Key=Service,Value="$SERVICE_NAME" \
-           Key=ManagedBy,Value=forge \
-    >/dev/null 2>&1; then
-    log_success "ECR repository created: $repository_name"
-    return 0
-  else
-    log_error "Failed to create ECR repository: $repository_name"
-    return 1
-  fi
-}
-
-apply_repository_policy() {
-  local repository_name="$1"
-  local eks_cluster_arn="$2"
-  local aws_account_id="$3"
-  
-  log_info "Applying repository policy..."
-  
-  local policy_json
-  policy_json=$(generate_ecr_policy "$eks_cluster_arn" "$aws_account_id")
-  
-  if [ "$DRY_RUN" = true ]; then
-    log_dry_run "Would apply repository policy:"
-    if command -v jq &> /dev/null; then
-      echo "$policy_json" | jq '.'
-    else
-      echo "$policy_json"
-    fi
-    return 0
-  fi
-  
-  if echo "$policy_json" | aws ecr set-repository-policy \
-    --repository-name "$repository_name" \
-    --region "$AWS_REGION" \
-    --policy-text file:///dev/stdin \
-    >/dev/null 2>&1; then
-    log_success "Repository policy applied"
-    return 0
-  else
-    log_error "Failed to apply repository policy"
-    return 1
-  fi
-}
-
-apply_lifecycle_policy() {
-  local repository_name="$1"
-  
-  log_info "Applying lifecycle policy..."
-  
-  local lifecycle_json
-  lifecycle_json=$(generate_lifecycle_policy)
-  
-  if [ "$DRY_RUN" = true ]; then
-    log_dry_run "Would apply lifecycle policy (keep last 4 images):"
-    if command -v jq &> /dev/null; then
-      echo "$lifecycle_json" | jq '.'
-    else
-      echo "$lifecycle_json"
-    fi
-    return 0
-  fi
-  
-  if echo "$lifecycle_json" | aws ecr put-lifecycle-policy \
-    --repository-name "$repository_name" \
-    --region "$AWS_REGION" \
-    --lifecycle-policy-text file:///dev/stdin \
-    >/dev/null 2>&1; then
-    log_success "Lifecycle policy applied (keep last 4 images)"
-    return 0
-  else
-    log_error "Failed to apply lifecycle policy"
-    return 1
-  fi
-}
+# Using functions from forge-ecr-operations.sh:
+# - ensure_ecr_repository() - Create repository (idempotent)
+# - apply_ecr_cluster_policy_with_builder() - Apply policy with Docker Builder
+# - apply_ecr_lifecycle_policy_default() - Apply lifecycle policy (keep 4 images)
+# ==============================================================================
 
 create_ecr() {
   local env="$1"
+  
+  # Generate repository name using forge-patterns
   local repository_name
   repository_name=$(get_ecr_repository_name "$CUSTOMER" "$PROJECT" "$env" "$SERVICE_NAME")
   
@@ -801,7 +537,7 @@ create_ecr() {
   log_info "  Repository: $repository_name"
   log_info "  Region: $AWS_REGION"
   
-  # Get AWS Account ID
+  # Get AWS Account ID using forge-aws-discovery
   local aws_account_id
   aws_account_id=$(get_aws_account_id) || {
     FAILED_REPOS+=("$env: Failed to get AWS account ID")
@@ -809,7 +545,7 @@ create_ecr() {
     return 1
   }
   
-  # Get EKS Cluster ARN
+  # Get EKS Cluster ARN using forge-aws-discovery
   local eks_cluster_arn
   eks_cluster_arn=$(get_eks_cluster_arn "$CLUSTER_NAME" "$AWS_REGION") || {
     FAILED_REPOS+=("$env: Failed to get EKS cluster ARN")
@@ -817,8 +553,8 @@ create_ecr() {
     return 1
   }
   
-  # Check if repository exists
-  if ecr_repository_exists "$repository_name"; then
+  # Check if repository exists using forge-ecr-operations
+  if ecr_repository_exists "$repository_name" "$AWS_REGION"; then
     log_warning "ECR repository already exists: $repository_name"
     
     if [ "$FORCE" = false ] && [ "$DRY_RUN" = false ]; then
@@ -831,33 +567,67 @@ create_ecr() {
       fi
     fi
   else
-    # Create ECR repository
-    if ! create_ecr_repository "$repository_name"; then
-      FAILED_REPOS+=("$env: Failed to create repository")
+    # Create ECR repository using forge-ecr-operations
+    if [ "$DRY_RUN" = true ]; then
+      log_dry_run "Would create ECR repository: $repository_name"
+      log_dry_run "  Tag mutability: MUTABLE"
+      log_dry_run "  Scan on push: true"
+      log_dry_run "  Tags: Customer=$CUSTOMER, Project=$PROJECT, Environment=$env, Service=$SERVICE_NAME"
+    else
+      local repo_info
+      repo_info=$(ensure_ecr_repository \
+        "$repository_name" \
+        "MUTABLE" \
+        "true" \
+        "Customer=$CUSTOMER,Project=$PROJECT,Environment=$env,Service=$SERVICE_NAME,ManagedBy=forge") || {
+        FAILED_REPOS+=("$env: Failed to create repository")
+        ((TOTAL_FAILED++))
+        return 1
+      }
+      log_success "ECR repository created: $repository_name"
+      ((TOTAL_CREATED++))
+    fi
+  fi
+  
+  # Apply repository policy WITH DOCKER BUILDER using forge-ecr-operations
+  # CRITICAL: Pass $SERVICE_NAME to enable per-service Docker Builder IAM role
+  if [ "$DRY_RUN" = true ]; then
+    log_dry_run "Would apply repository policy with Docker Builder support"
+    log_dry_run "  EKS Cluster: $eks_cluster_arn"
+    log_dry_run "  Docker Builder Role: $(get_docker_builder_role_name "$CUSTOMER" "$PROJECT" "$env" "$SERVICE_NAME")"
+  else
+    if ! apply_ecr_cluster_policy_with_builder \
+      "$repository_name" \
+      "$eks_cluster_arn" \
+      "$aws_account_id" \
+      "$CUSTOMER" \
+      "$PROJECT" \
+      "$env" \
+      "$SERVICE_NAME"; then
+      FAILED_REPOS+=("$env: Failed to apply repository policy")
       ((TOTAL_FAILED++))
       return 1
     fi
-    ((TOTAL_CREATED++))
+    log_success "Repository policy applied with Docker Builder support"
   fi
   
-  # Apply repository policy
-  if ! apply_repository_policy "$repository_name" "$eks_cluster_arn" "$aws_account_id"; then
-    FAILED_REPOS+=("$env: Failed to apply repository policy")
-    ((TOTAL_FAILED++))
-    return 1
-  fi
-  
-  # Apply lifecycle policy
-  if ! apply_lifecycle_policy "$repository_name"; then
-    FAILED_REPOS+=("$env: Failed to apply lifecycle policy")
-    ((TOTAL_FAILED++))
-    return 1
+  # Apply lifecycle policy using forge-ecr-operations
+  if [ "$DRY_RUN" = true ]; then
+    log_dry_run "Would apply lifecycle policy (keep last 4 images)"
+  else
+    if ! apply_ecr_lifecycle_policy_default "$repository_name"; then
+      FAILED_REPOS+=("$env: Failed to apply lifecycle policy")
+      ((TOTAL_FAILED++))
+      return 1
+    fi
+    log_success "Lifecycle policy applied (keep last 4 images)"
   fi
   
   # Show repository URI
   local repository_uri="${aws_account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com/${repository_name}"
   log_success "ECR repository configured successfully"
   log_info "  URI: $repository_uri"
+  log_info "  Docker Builder Role: $(get_docker_builder_role_name "$CUSTOMER" "$PROJECT" "$env" "$SERVICE_NAME")"
   
   CREATED_REPOS+=("$env:$repository_uri")
   
@@ -867,16 +637,22 @@ create_ecr() {
 # ==============================================================================
 # ECR Repository Operations - Delete
 # ==============================================================================
+# Using functions from forge-ecr-operations.sh:
+# - ecr_repository_exists() - Check if repository exists
+# - delete_ecr_repository() - Delete repository with force option
+# ==============================================================================
 
 delete_ecr() {
   local env="$1"
+  
+  # Generate repository name using forge-patterns
   local repository_name
   repository_name=$(get_ecr_repository_name "$CUSTOMER" "$PROJECT" "$env" "$SERVICE_NAME")
   
   log_info "Deleting ECR repository: $repository_name"
   
-  # Check if repository exists
-  if ! ecr_repository_exists "$repository_name"; then
+  # Check if repository exists using forge-ecr-operations
+  if ! ecr_repository_exists "$repository_name" "$AWS_REGION"; then
     log_warning "ECR repository does not exist: $repository_name"
     ((TOTAL_SKIPPED++))
     return 0
@@ -913,12 +689,8 @@ delete_ecr() {
     return 0
   fi
   
-  # Delete repository (--force deletes even if contains images)
-  if aws ecr delete-repository \
-    --repository-name "$repository_name" \
-    --region "$AWS_REGION" \
-    --force \
-    >/dev/null 2>&1; then
+  # Delete repository using forge-ecr-operations (force=true)
+  if delete_ecr_repository "$repository_name" true; then
     log_success "ECR repository deleted: $repository_name"
     DELETED_REPOS+=("$env:$repository_name")
     ((TOTAL_DELETED++))
@@ -1040,7 +812,7 @@ process_environment() {
   
   # Check if repository exists for image operations
   if [ "$WIPE_IMAGES" = true ] || [ -n "$DELETE_IMAGE" ] || [ -n "$CHECK_IMAGE" ]; then
-    if ! ecr_repository_exists "$repository_name"; then
+    if ! ecr_repository_exists "$repository_name" "$AWS_REGION"; then
       log_error "ECR repository does not exist: $repository_name"
       ((TOTAL_FAILED++))
       return 1
