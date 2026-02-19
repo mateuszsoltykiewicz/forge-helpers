@@ -17,8 +17,8 @@
 #
 # Usage:
 #   source /path/to/forge-patterns.sh
-#   namespace=$(get_namespace_name "sanofi" "cronus" "dev" "video-calling-agent")
-#   ecr_repo=$(get_ecr_repository_name "sanofi" "cronus" "dev" "video-calling-agent")
+#   namespace=$(get_namespace_name "customer" "project" "environment" "service")
+#   ecr_repo=$(get_ecr_repository_name "customer" "project" "environment" "service")
 # ==============================================================================
 
 set -euo pipefail
@@ -63,17 +63,17 @@ fi
 # Pattern: {customer}-{project}-{environment}-{service-name}
 #
 # Arguments:
-#   $1 - Customer name (e.g., sanofi, indegene)
-#   $2 - Project name (e.g., cronus, platform)
+#   $1 - Customer name (e.g., acme, techcorp)
+#   $2 - Project name (e.g., platform, backend)
 #   $3 - Environment (e.g., dev, staging, prod)
-#   $4 - Service name (e.g., video-calling-agent)
+#   $4 - Service name (e.g., api-gateway)
 #
 # Output:
 #   Namespace name to stdout
 #
 # Example:
-#   get_namespace_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent
+#   get_namespace_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway
 #
 get_namespace_name() {
   local customer="$1"
@@ -98,8 +98,8 @@ get_namespace_name() {
 #   ServiceAccount name to stdout
 #
 # Example:
-#   get_service_account_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent-sa
+#   get_service_account_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway-sa
 #
 get_service_account_name() {
   local customer="$1"
@@ -124,8 +124,8 @@ get_service_account_name() {
 #   Deployment name to stdout
 #
 # Example:
-#   get_deployment_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent
+#   get_deployment_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway
 #
 get_deployment_name() {
   local customer="$1"
@@ -150,8 +150,8 @@ get_deployment_name() {
 #   Service name to stdout
 #
 # Example:
-#   get_service_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent
+#   get_service_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway
 #
 get_service_name() {
   local customer="$1"
@@ -177,8 +177,8 @@ get_service_name() {
 #   ConfigMap name to stdout
 #
 # Example:
-#   get_configmap_name "sanofi" "cronus" "dev" "video-calling-agent" "config"
-#   # Output: sanofi-cronus-dev-video-calling-agent-config
+#   get_configmap_name "customer" "project" "dev" "api-gateway" "config"
+#   # Output: customer-project-dev-api-gateway-config
 #
 get_configmap_name() {
   local customer="$1"
@@ -211,8 +211,8 @@ get_configmap_name() {
 #   Secret name to stdout
 #
 # Example:
-#   get_secret_name "sanofi" "cronus" "dev" "video-calling-agent" "credentials"
-#   # Output: sanofi-cronus-dev-video-calling-agent-credentials
+#   get_secret_name "customer" "project" "dev" "api-gateway" "credentials"
+#   # Output: customer-project-dev-api-gateway-credentials
 #
 get_secret_name() {
   local customer="$1"
@@ -249,8 +249,8 @@ get_secret_name() {
 #   Comma-separated labels to stdout
 #
 # Example:
-#   labels=$(get_forge_labels "sanofi" "cronus" "dev" "video-calling-agent")
-#   # Output: forge.moai.io/customer=sanofi,forge.moai.io/project=cronus,...
+#   labels=$(get_forge_labels "customer" "project" "dev" "api-gateway")
+#   # Output: forge.moai.io/customer=customer,forge.moai.io/project=project,...
 #
 get_forge_labels() {
   local customer="$1"
@@ -292,7 +292,7 @@ get_forge_labels() {
 #
 # Example:
 #   service=$(auto_detect_service_name)
-#   # In /path/to/video-calling-agent: "video-calling-agent"
+#   # In /path/to/api-gateway: "api-gateway"
 auto_detect_service_name() {
   local service_name=""
   
@@ -347,8 +347,8 @@ auto_detect_service_name() {
 #   1 - Invalid customer name
 #
 # Example:
-#   validate_customer_name "sanofi"  # Returns 0
-#   validate_customer_name "123"     # Returns 1
+#   validate_customer_name "acme"  # Returns 0
+#   validate_customer_name "123"   # Returns 1
 validate_customer_name() {
   local name="$1"
   
@@ -452,8 +452,8 @@ validate_environment_name() {
 #   1 - Invalid service name
 #
 # Example:
-#   validate_service_name "video-calling-agent"  # Returns 0
-#   validate_service_name "-invalid-name-"       # Returns 1
+#   validate_service_name "api-gateway"       # Returns 0
+#   validate_service_name "-invalid-name-"    # Returns 1
 validate_service_name() {
   local name="$1"
   
@@ -497,8 +497,8 @@ validate_service_name() {
 #   ECR repository name to stdout
 #
 # Example:
-#   get_ecr_repository_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi/cronus/dev/video-calling-agent
+#   get_ecr_repository_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer/project/dev/api-gateway
 #
 get_ecr_repository_name() {
   local customer="$1"
@@ -548,8 +548,8 @@ get_ecr_registry_url() {
 #   Complete ECR image URI to stdout
 #
 # Example:
-#   get_ecr_image_uri "398456183268" "eu-central-1" "sanofi" "cronus" "dev" "video-calling-agent" "abc123f"
-#   # Output: 398456183268.dkr.ecr.eu-central-1.amazonaws.com/sanofi/cronus/dev/video-calling-agent:abc123f
+#   get_ecr_image_uri "123456789012" "us-east-1" "customer" "project" "dev" "api-gateway" "abc123f"
+#   # Output: 123456789012.dkr.ecr.us-east-1.amazonaws.com/customer/project/dev/api-gateway:abc123f
 #
 get_ecr_image_uri() {
   local account_id="$1"
@@ -580,8 +580,8 @@ get_ecr_image_uri() {
 #   IRSA role name to stdout
 #
 # Example:
-#   get_irsa_role_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: SanofiCronusDevVideoCallingAgentIrsa
+#   get_irsa_role_name "customer" "project" "dev" "api-gateway"
+#   # Output: CustomerProjectDevApiGatewayIrsa
 #
 get_irsa_role_name() {
   local customer="$1"
@@ -611,8 +611,8 @@ get_irsa_role_name() {
 #   IRSA policy name to stdout
 #
 # Example:
-#   get_irsa_policy_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: SanofiCronusDevVideoCallingAgentIrsaPolicy
+#   get_irsa_policy_name "customer" "project" "dev" "api-gateway"
+#   # Output: CustomerProjectDevApiGatewayIrsaPolicy
 #
 get_irsa_policy_name() {
   local customer="$1"
@@ -638,8 +638,8 @@ get_irsa_policy_name() {
 #   S3 bucket name to stdout
 #
 # Example:
-#   get_s3_bucket_name "sanofi" "cronus" "dev" "video-calling" "recordings"
-#   # Output: sanofi-cronus-dev-video-calling-recordings
+#   get_s3_bucket_name "customer" "project" "dev" "api" "uploads"
+#   # Output: customer-project-dev-api-uploads
 #
 get_s3_bucket_name() {
   local customer="$1"
@@ -675,8 +675,8 @@ get_s3_bucket_name() {
 #   SSM base path to stdout
 #
 # Example:
-#   get_ssm_base_path "sanofi" "cronus" "dev" "video-calling"
-#   # Output: /sanofi/cronus/dev/video-calling
+#   get_ssm_base_path "customer" "project" "dev" "api"
+#   # Output: /customer/project/dev/api
 #
 get_ssm_base_path() {
   local customer="$1"
@@ -702,8 +702,8 @@ get_ssm_base_path() {
 #   SSM parameter path to stdout
 #
 # Example:
-#   get_ssm_parameter_path "sanofi" "cronus" "dev" "video-calling-agent" "livekit-api-key"
-#   # Output: /sanofi/cronus/dev/video-calling-agent/livekit-api-key
+#   get_ssm_parameter_path "customer" "project" "dev" "api-gateway" "db-password"
+#   # Output: /customer/project/dev/api-gateway/db-password
 #
 get_ssm_parameter_path() {
   local customer="$1"
@@ -734,8 +734,8 @@ get_ssm_parameter_path() {
 #   KMS key alias to stdout
 #
 # Example:
-#   get_kms_key_alias_path "sanofi" "cronus" "dev" "video-calling" "encryption"
-#   # Output: alias/sanofi/cronus/dev/video-calling/encryption
+#   get_kms_key_alias_path "customer" "project" "dev" "api" "encryption"
+#   # Output: alias/customer/project/dev/api/encryption
 #
 get_kms_key_alias_path() {
   local customer="$1"
@@ -761,8 +761,8 @@ get_kms_key_alias_path() {
 #   KMS key description to stdout
 #
 # Example:
-#   get_kms_key_description "sanofi" "cronus" "dev" "video-calling" "encryption"
-#   # Output: KMS key for sanofi-cronus-dev-video-calling (purpose: encryption)
+#   get_kms_key_description "customer" "project" "dev" "api" "encryption"
+#   # Output: KMS key for customer-project-dev-api (purpose: encryption)
 #
 get_kms_key_description() {
   local customer="$1"
@@ -788,7 +788,7 @@ get_kms_key_description() {
 #   Space-separated tag key=value pairs for AWS CLI
 #
 # Example:
-#   get_kms_key_tags "sanofi" "cronus" "dev" "video-calling" "encryption"
+#   get_kms_key_tags "customer" "project" "dev" "api" "encryption"
 #
 get_kms_key_tags() {
   local customer="$1"
@@ -815,7 +815,7 @@ get_kms_key_tags() {
 #   JSON key policy to stdout
 #
 # Example:
-#   policy=$(get_kms_key_policy "123456789012" "sanofi" "cronus" "dev" "video-calling" "eu-central-1")
+#   policy=$(get_kms_key_policy "123456789012" "customer" "project" "dev" "api" "us-east-1")
 #
 get_kms_key_policy() {
   local account_id="$1"
@@ -898,8 +898,8 @@ EOF
 #   Space-separated tags to stdout (Key=Value format)
 #
 # Example:
-#   tags=$(get_aws_tags "sanofi" "cronus" "dev" "video-calling-agent")
-#   # Output: Customer=sanofi Project=cronus Environment=dev Service=video-calling-agent ManagedBy=forge
+#   tags=$(get_aws_tags "customer" "project" "dev" "api-gateway")
+#   # Output: Customer=customer Project=project Environment=dev Service=api-gateway ManagedBy=forge
 #
 get_aws_tags() {
   local customer="$1"
@@ -937,11 +937,11 @@ get_aws_tags() {
 #   Database name to stdout
 #
 # Example:
-#   get_database_name "sanofi" "cronus" "prod" "videocalling"
-#   # Output: sanofi_cronus_prod_videocalling_db
+#   get_database_name "customer" "project" "prod" "api"
+#   # Output: customer_project_prod_api_db
 #
-#   get_database_name "sanofi" "cronus" "prod" "videocalling" "recordings"
-#   # Output: sanofi_cronus_prod_videocalling_recordings_db
+#   get_database_name "customer" "project" "prod" "api" "analytics"
+#   # Output: customer_project_prod_api_analytics_db
 #
 get_database_name() {
   local customer=$(to_snake_case "$1")
@@ -973,8 +973,8 @@ get_database_name() {
 #   Database user name to stdout
 #
 # Example:
-#   get_database_user "sanofi" "cronus" "prod" "videocalling"
-#   # Output: sanofi_cronus_prod_videocalling_user
+#   get_database_user "customer" "project" "prod" "api"
+#   # Output: customer_project_prod_api_user
 #
 get_database_user() {
   local customer=$(to_snake_case "$1")
@@ -999,8 +999,8 @@ get_database_user() {
 #   RDS instance identifier to stdout
 #
 # Example:
-#   get_rds_instance_identifier "sanofi" "cronus" "prod"
-#   # Output: sanofi-cronus-prod-db
+#   get_rds_instance_identifier "customer" "project" "prod"
+#   # Output: customer-project-prod-db
 #
 get_rds_instance_identifier() {
   local customer=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -1041,8 +1041,8 @@ get_default_schema_name() {
 #   SSM parameter path to stdout
 #
 # Example:
-#   get_rds_admin_username_path "sanofi" "cronus" "prod"
-#   # Output: /rds/sanofi/cronus/prod/db/username
+#   get_rds_admin_username_path "customer" "project" "prod"
+#   # Output: /rds/customer/project/prod/db/username
 #
 get_rds_admin_username_path() {
   local customer=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -1065,8 +1065,8 @@ get_rds_admin_username_path() {
 #   SSM parameter path to stdout
 #
 # Example:
-#   get_rds_admin_password_path "sanofi" "cronus" "prod"
-#   # Output: /rds/sanofi/cronus/prod/db/password
+#   get_rds_admin_password_path "customer" "project" "prod"
+#   # Output: /rds/customer/project/prod/db/password
 #
 get_rds_admin_password_path() {
   local customer=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -1127,8 +1127,8 @@ get_database_connection_string() {
 #   Vault secret path to stdout
 #
 # Example:
-#   get_vault_secret_path "sanofi" "cronus" "dev" "video-calling-agent" "livekit"
-#   # Output: secret/sanofi/cronus/dev/video-calling-agent/livekit
+#   get_vault_secret_path "customer" "project" "dev" "api-gateway" "database"
+#   # Output: secret/customer/project/dev/api-gateway/database
 #
 get_vault_secret_path() {
   local customer="$1"
@@ -1155,8 +1155,8 @@ get_vault_secret_path() {
 #   Vault secret data path to stdout
 #
 # Example:
-#   get_vault_secret_data_path "sanofi" "cronus" "dev" "video-calling-agent" "livekit"
-#   # Output: secret/data/sanofi/cronus/dev/video-calling-agent/livekit
+#   get_vault_secret_data_path "customer" "project" "dev" "api-gateway" "database"
+#   # Output: secret/data/customer/project/dev/api-gateway/database
 #
 get_vault_secret_data_path() {
   local customer="$1"
@@ -1183,8 +1183,8 @@ get_vault_secret_data_path() {
 #   Vault secret metadata path to stdout
 #
 # Example:
-#   get_vault_secret_metadata_path "sanofi" "cronus" "dev" "video-calling-agent" "livekit"
-#   # Output: secret/metadata/sanofi/cronus/dev/video-calling-agent/livekit
+#   get_vault_secret_metadata_path "customer" "project" "dev" "api-gateway" "database"
+#   # Output: secret/metadata/customer/project/dev/api-gateway/database
 #
 get_vault_secret_metadata_path() {
   local customer="$1"
@@ -1210,8 +1210,8 @@ get_vault_secret_metadata_path() {
 #   Vault policy name to stdout
 #
 # Example:
-#   get_vault_policy_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent-policy
+#   get_vault_policy_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway-policy
 #
 get_vault_policy_name() {
   local customer="$1"
@@ -1236,8 +1236,8 @@ get_vault_policy_name() {
 #   Vault role name to stdout
 #
 # Example:
-#   get_vault_role_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Output: sanofi-cronus-dev-video-calling-agent-role
+#   get_vault_role_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway-role
 #
 get_vault_role_name() {
   local customer="$1"
@@ -1393,9 +1393,9 @@ export -f validate_forge_pattern_args
 # Output: CamelCase string
 # Returns: 0 always
 # Examples:
-#   to_camel_case "video-calling-service" -> "VideoCallingService"
+#   to_camel_case "api-gateway-service" -> "ApiGatewayService"
 #   to_camel_case "my_service_name" -> "MyServiceName"
-#   to_camel_case "sanofi" -> "Sanofi"
+#   to_camel_case "example" -> "Example"
 ################################################################################
 to_camel_case() {
     local input="$1"
@@ -1423,8 +1423,8 @@ export -f to_camel_case
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_ssh_key_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "SanofiCronusDevVideoCallingAgentBuildSshKey"
+#   get_ssh_key_name "customer" "project" "dev" "api-gateway"
+#   -> "CustomerProjectDevApiGatewayBuildSshKey"
 ################################################################################
 get_ssh_key_name() {
     local customer="$1"
@@ -1461,8 +1461,8 @@ get_ssh_key_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_ssh_private_key_ssm_path "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "/forge/sanofi/cronus/dev/video-calling-agent/ssh/SanofiCronusDevVideoCallingAgentBuildSshKey/private"
+#   get_ssh_private_key_ssm_path "customer" "project" "dev" "api-gateway"
+#   -> "/forge/customer/project/dev/api-gateway/ssh/CustomerProjectDevApiGatewayBuildSshKey/private"
 ################################################################################
 get_ssh_private_key_ssm_path() {
     local customer="$1"
@@ -1557,11 +1557,11 @@ export -f get_ssh_key_metadata_ssm_path
 #   0 - Success
 #   1 - Validation failed
 # Examples:
-#   get_iam_role_name "sanofi" "cronus" "dev" "video-calling-agent" "DockerBuilder"
-#   -> "SanofiCronusDevVideoCallingAgentDockerBuilderIrsa"
+#   get_iam_role_name "customer" "project" "dev" "api-gateway" "DockerBuilder"
+#   -> "CustomerProjectDevApiGatewayDockerBuilderIrsa"
 #
-#   get_iam_role_name "sanofi" "cronus" "dev" "video-calling-agent" "S3Reader"
-#   -> "SanofiCronusDevVideoCallingAgentS3ReaderIrsa"
+#   get_iam_role_name "customer" "project" "dev" "api-gateway" "S3Reader"
+#   -> "CustomerProjectDevApiGatewayS3ReaderIrsa"
 ################################################################################
 get_iam_role_name() {
     local customer="$1"
@@ -1610,8 +1610,8 @@ get_iam_role_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_iam_policy_name "sanofi" "cronus" "dev" "video-calling-agent" "DockerBuilder"
-#   -> "SanofiCronusDevVideoCallingAgentDockerBuilderIrsaPolicy"
+#   get_iam_policy_name "customer" "project" "dev" "api-gateway" "DockerBuilder"
+#   -> "CustomerProjectDevApiGatewayDockerBuilderIrsaPolicy"
 ################################################################################
 get_iam_policy_name() {
     local customer="$1"
@@ -1642,11 +1642,11 @@ get_iam_policy_name() {
 #   0 - Success
 #   1 - Validation failed
 # Examples:
-#   get_service_account_name_with_purpose "sanofi" "cronus" "dev" "video-calling-agent" "DockerBuilder"
-#   -> "sanofi-cronus-dev-video-calling-agent-docker-builder-sa"
+#   get_service_account_name_with_purpose "customer" "project" "dev" "api-gateway" "DockerBuilder"
+#   -> "customer-project-dev-api-gateway-docker-builder-sa"
 #
-#   get_service_account_name_with_purpose "sanofi" "cronus" "dev" "video-calling-agent" "S3Reader"
-#   -> "sanofi-cronus-dev-video-calling-agent-s3-reader-sa"
+#   get_service_account_name_with_purpose "customer" "project" "dev" "api-gateway" "S3Reader"
+#   -> "customer-project-dev-api-gateway-s3-reader-sa"
 # 
 # Note: PascalCase purpose is converted to kebab-case (DockerBuilder -> docker-builder)
 ################################################################################
@@ -1692,11 +1692,11 @@ get_service_account_name_with_purpose() {
 #   0 - Success
 #   1 - Validation failed
 # Examples:
-#   get_job_name "sanofi" "cronus" "dev" "video-calling-agent" "docker-build"
-#   -> "sanofi-cronus-dev-video-calling-agent-docker-build"
+#   get_job_name "customer" "project" "dev" "api-gateway" "docker-build"
+#   -> "customer-project-dev-api-gateway-docker-build"
 #
-#   get_job_name "sanofi" "cronus" "dev" "video-calling-agent" "db-migration"
-#   -> "sanofi-cronus-dev-video-calling-agent-db-migration"
+#   get_job_name "customer" "project" "dev" "api-gateway" "db-migration"
+#   -> "customer-project-dev-api-gateway-db-migration"
 ################################################################################
 get_job_name() {
     local customer="$1"
@@ -1742,8 +1742,8 @@ get_job_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_docker_builder_role_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "SanofiCronusDevVideoCallingAgentDockerBuilderIrsa"
+#   get_docker_builder_role_name "customer" "project" "dev" "api-gateway"
+#   -> "CustomerProjectDevApiGatewayDockerBuilderIrsa"
 ################################################################################
 get_docker_builder_role_name() {
     local customer="$1"
@@ -1768,8 +1768,8 @@ get_docker_builder_role_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_docker_builder_policy_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "SanofiCronusDevVideoCallingAgentDockerBuilderIrsaPolicy"
+#   get_docker_builder_policy_name "customer" "project" "dev" "api-gateway"
+#   -> "CustomerProjectDevApiGatewayDockerBuilderIrsaPolicy"
 ################################################################################
 get_docker_builder_policy_name() {
     local customer="$1"
@@ -1794,8 +1794,8 @@ get_docker_builder_policy_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_docker_builder_service_account_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "sanofi-cronus-dev-video-calling-agent-docker-builder-sa"
+#   get_docker_builder_service_account_name "customer" "project" "dev" "api-gateway"
+#   -> "customer-project-dev-api-gateway-docker-builder-sa"
 ################################################################################
 get_docker_builder_service_account_name() {
     local customer="$1"
@@ -1820,8 +1820,8 @@ get_docker_builder_service_account_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_docker_builder_job_name "sanofi" "cronus" "dev" "video-calling-agent"
-#   -> "sanofi-cronus-dev-video-calling-agent-docker-build"
+#   get_docker_builder_job_name "customer" "project" "dev" "api-gateway"
+#   -> "customer-project-dev-api-gateway-docker-build"
 ################################################################################
 get_docker_builder_job_name() {
     local customer="$1"
@@ -1851,8 +1851,8 @@ get_docker_builder_job_name() {
 #   0 - Success
 #   1 - Validation failed
 # Example:
-#   get_queue_name "sanofi" "cronus" "prod" "videocalling-events"
-#   -> "sanofi-cronus-prod-videocalling-events.fifo"
+#   get_queue_name "customer" "project" "prod" "api-events"
+#   -> "customer-project-prod-api-events.fifo"
 ################################################################################
 get_queue_name() {
     local customer="$1"
@@ -1891,8 +1891,8 @@ get_queue_name() {
 #   $4 - Purpose
 # Output: Policy name
 # Example:
-#   get_queue_policy_name "sanofi" "cronus" "prod" "videocalling-events"
-#   -> "sanofi-cronus-prod-videocalling-events-sqs-policy"
+#   get_queue_policy_name "customer" "project" "prod" "api-events"
+#   -> "customer-project-prod-api-events-sqs-policy"
 ################################################################################
 get_queue_policy_name() {
     local customer="$1"
@@ -1919,8 +1919,8 @@ get_queue_policy_name() {
 #   $3 - Environment name
 # Output: KMS key alias
 # Example:
-#   get_sqs_kms_key_alias "sanofi" "cronus" "prod"
-#   -> "alias/sanofi-cronus-prod-sqs-key"
+#   get_sqs_kms_key_alias "customer" "project" "prod"
+#   -> "alias/customer-project-prod-sqs-key"
 ################################################################################
 get_sqs_kms_key_alias() {
     local customer="$1"
@@ -1942,8 +1942,8 @@ get_sqs_kms_key_alias() {
 #   $3 - Environment name
 # Output: KMS key description
 # Example:
-#   get_sqs_kms_key_description "sanofi" "cronus" "prod"
-#   -> "SQS encryption key for sanofi-cronus-prod"
+#   get_sqs_kms_key_description "customer" "project" "prod"
+#   -> "SQS encryption key for customer-project-prod"
 ################################################################################
 get_sqs_kms_key_description() {
     local customer="$1"
@@ -1965,8 +1965,8 @@ get_sqs_kms_key_description() {
 #   $6 - AWS account ID
 # Output: IRSA role ARN
 # Example:
-#   get_irsa_role_arn "sanofi" "cronus" "prod" "video-calling-api" "eu-central-1" "123456789012"
-#   -> "arn:aws:iam::123456789012:role/SanofiCronusProdVideoCallingApiIrsa"
+#   get_irsa_role_arn "customer" "project" "prod" "api" "eu-central-1" "123456789012"
+#   -> "arn:aws:iam::123456789012:role/CustomerProjectProdApiIrsa"
 ################################################################################
 get_sqs_irsa_role_arn() {
     local customer="$1"
@@ -1992,8 +1992,8 @@ get_sqs_irsa_role_arn() {
 #   $3 - Environment name
 # Output: Kubernetes namespace
 # Example:
-#   get_kubernetes_namespace "sanofi" "cronus" "prod"
-#   -> "sanofi-cronus-prod"
+#   get_kubernetes_namespace "customer" "project" "prod"
+#   -> "customer-project-prod"
 ################################################################################
 get_kubernetes_namespace() {
     local customer="$1"
@@ -2016,8 +2016,8 @@ get_kubernetes_namespace() {
 #   $3 - Environment name
 # Output: EKS cluster name
 # Example:
-#   get_eks_cluster_name "sanofi" "cronus" "prod"
-#   -> "sanofi-cronus-prod-eks"
+#   get_eks_cluster_name "customer" "project" "prod"
+#   -> "customer-project-prod-eks"
 ################################################################################
 get_eks_cluster_name() {
     local customer="$1"
@@ -2040,8 +2040,8 @@ get_eks_cluster_name() {
 #   $2 - Project name
 # Output: VPC Endpoint name
 # Example:
-#   get_vpc_endpoint_name_sqs "sanofi" "cronus"
-#   -> "sanofi-cronus-sqs-vpce"
+#   get_vpc_endpoint_name_sqs "customer" "project"
+#   -> "customer-project-sqs-vpce"
 ################################################################################
 get_vpc_endpoint_name_sqs() {
     local customer="$1"
@@ -2062,8 +2062,8 @@ get_vpc_endpoint_name_sqs() {
 #   $3 - Environment name
 # Output: SSM parameter path
 # Example:
-#   get_sqs_kms_key_id_path "sanofi" "cronus" "prod"
-#   -> "/sqs/sanofi/cronus/prod/kms-key-id"
+#   get_sqs_kms_key_id_path "customer" "project" "prod"
+#   -> "/sqs/customer/project/prod/kms-key-id"
 ################################################################################
 get_sqs_kms_key_id_path() {
     local customer="$1"
@@ -2083,8 +2083,8 @@ get_sqs_kms_key_id_path() {
 #   $4 - Purpose
 # Output: SSM parameter path
 # Example:
-#   get_sqs_queue_url_path "sanofi" "cronus" "prod" "videocalling-events"
-#   -> "/sqs/sanofi/cronus/prod/videocalling-events/queue-url"
+#   get_sqs_queue_url_path "customer" "project" "prod" "api-events"
+#   -> "/sqs/customer/project/prod/videocalling-events/queue-url"
 ################################################################################
 get_sqs_queue_url_path() {
     local customer="$1"
