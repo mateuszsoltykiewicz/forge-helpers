@@ -284,7 +284,7 @@ delete_ecr_repository_safe() {
 #   policy=$(generate_ecr_cluster_policy_with_builder \
 #     "arn:aws:eks:eu-central-1:123:cluster/my-cluster" \
 #     "123456789012" \
-#     "sanofi" "cronus" "dev" "video-calling-agent")
+#     "customer" "project" "dev" "application-agent")
 ################################################################################
 generate_ecr_cluster_policy_with_builder() {
     local eks_cluster_arn="$1"

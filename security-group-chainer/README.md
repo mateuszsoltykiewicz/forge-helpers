@@ -45,8 +45,8 @@ region: "us-east-2"
 vpc_id: ""  # Optional: set explicitly or leave empty for auto-discovery
 
 # Customer and Project identifiers (required for VPC auto-discovery)
-customer_name: "Sanofi"
-project_name: "Cronus"
+customer_name: "customer"
+project_name: "project"
 environment: "shared"  # Options: development, staging, production, shared
 current_deployment: "Primary"  # Optional: used as fallback if multiple VPCs found
 
@@ -87,8 +87,8 @@ The chainer can automatically discover VPC ID by tags, enabling parallel executi
 region: "us-east-2"
 vpc_id: ""  # Empty = auto-discovery
 
-customer_name: "Sanofi"
-project_name: "Cronus"
+customer_name: "customer"
+project_name: "project"
 environment: "shared"
 current_deployment: "Primary"
 
@@ -119,8 +119,8 @@ vpc_discovery:
   duration_seconds: 45.3
   attempts: 4
   tags_used:
-    Customer: "Sanofi"
-    Project: "Cronus"
+    Customer: "customer"
+    Project: "project"
     Region: "us-east-2"
     Environment: "shared"
     CurrentDeployment: "Primary"

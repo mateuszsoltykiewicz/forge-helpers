@@ -1069,7 +1069,7 @@ measure_namespace_resources() {
 - **Naming Convention:**
   - Global: `forge-operator` (single operator for entire cluster)
   - Per-customer: `forge-operator-{customer}` (e.g., `forge-operator-acme`)
-  - Per-project: `forge-operator-{project}` (e.g., `forge-operator-cronus`)
+  - Per-project: `forge-operator-{project}` (e.g., `forge-operator-project`)
   - Per-service: `forge-operator-{service}` (e.g., `forge-operator-payment`)
 - **Typical Quota:** 200m CPU, 256Mi memory, 5 pods (orchestrator HA + webhook)
 - **Key Features:**
@@ -1107,8 +1107,8 @@ measure_namespace_resources() {
 ./namespace-create.sh --name forge-jobs-acme --type forge-jobs --project acme
 
 # Pattern 3: Per-project isolation (multi-project customers)
-./namespace-create.sh --name forge-operator-cronus --type forge-operator --project cronus
-./namespace-create.sh --name forge-jobs-cronus --type forge-jobs --project cronus
+./namespace-create.sh --name forge-operator-project --type forge-operator --project project
+./namespace-create.sh --name forge-jobs-project --type forge-jobs --project project
 
 # Pattern 4: Per-service isolation (microservices architecture)
 ./namespace-create.sh --name forge-operator-payment --type forge-operator --project payment-service

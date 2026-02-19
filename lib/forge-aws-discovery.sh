@@ -23,7 +23,7 @@
 #   source /path/to/forge-aws-discovery.sh
 #   region=$(get_aws_region)
 #   account_id=$(get_aws_account_id)
-#   cluster=$(discover_eks_cluster_by_namespace "sanofi-cronus-dev-video-calling-agent")
+#   cluster=$(discover_eks_cluster_by_namespace "customer-project-dev-application-agent")
 # ==============================================================================
 
 set -euo pipefail
@@ -362,7 +362,7 @@ get_eks_oidc_provider() {
 #   1 - Cluster not found
 #
 # Example:
-#   cluster=$(discover_eks_cluster_by_namespace "sanofi-cronus-dev-video-calling-agent")
+#   cluster=$(discover_eks_cluster_by_namespace "customer-project-dev-application-agent")
 #   if [[ -n "$cluster" ]]; then
 #     echo "Found namespace in cluster: $cluster"
 #   fi
@@ -480,10 +480,10 @@ configure_eks_kubeconfig() {
 #   cluster=$(discover_eks_cluster "cluster-name" "indegene-eks")
 #
 #   # Method 2: Search by namespace
-#   cluster=$(discover_eks_cluster "namespace" "sanofi-cronus-dev-video-calling-agent")
+#   cluster=$(discover_eks_cluster "namespace" "customer-project-dev-application-agent")
 #
 #   # Method 3: Auto-build namespace from Forge pattern
-#   cluster=$(discover_eks_cluster "forge-pattern" "sanofi" "cronus" "dev" "video-calling-agent")
+#   cluster=$(discover_eks_cluster "forge-pattern" "customer" "project" "dev" "application-agent")
 #
 discover_eks_cluster() {
   local method="$1"
@@ -575,10 +575,10 @@ discover_eks_cluster() {
 #   configure_eks_context "cluster-name" "indegene-eks"
 #
 #   # Method 2: Auto-discover by namespace
-#   configure_eks_context "namespace" "sanofi-cronus-dev-video-calling-agent"
+#   configure_eks_context "namespace" "customer-project-dev-application-agent"
 #
 #   # Method 3: Forge pattern (recommended)
-#   configure_eks_context "forge-pattern" "sanofi" "cronus" "dev" "video-calling-agent"
+#   configure_eks_context "forge-pattern" "customer" "project" "dev" "application-agent"
 #
 configure_eks_context() {
   local method="$1"
@@ -653,7 +653,7 @@ configure_eks_context() {
 #   1 - Repository does not exist
 #
 # Example:
-#   if check_ecr_repository_exists "sanofi/cronus/dev/video-calling-agent"; then
+#   if check_ecr_repository_exists "customer/project/dev/application-agent"; then
 #     echo "Repository exists"
 #   fi
 #
@@ -686,7 +686,7 @@ check_ecr_repository_exists() {
 #   Repository URI to stdout (e.g., 123456789.dkr.ecr.eu-central-1.amazonaws.com/repo)
 #
 # Example:
-#   uri=$(get_ecr_repository_uri "sanofi/cronus/dev/video-calling-agent")
+#   uri=$(get_ecr_repository_uri "customer/project/dev/application-agent")
 #
 get_ecr_repository_uri() {
   local repository_name="$1"
@@ -723,8 +723,8 @@ get_ecr_repository_uri() {
 #   1 - Failed to create repository
 #
 # Example:
-#   create_ecr_repository "sanofi/cronus/dev/video-calling-agent" \
-#     "sanofi" "cronus" "dev" "video-calling-agent"
+#   create_ecr_repository "customer/project/dev/application-agent" \
+#     "customer" "project" "dev" "application-agent"
 #
 create_ecr_repository() {
   local repository_name="$1"
@@ -841,7 +841,7 @@ ecr_docker_login() {
 #   Parameter value to stdout
 #
 # Example:
-#   api_key=$(get_ssm_parameter "/sanofi/cronus/dev/video-calling-agent/livekit-api-key")
+#   api_key=$(get_ssm_parameter "/customer/project/dev/application-agent/livekit-api-key")
 #
 get_ssm_parameter() {
   local parameter_name="$1"
@@ -885,7 +885,7 @@ get_ssm_parameter() {
 #   1 - Failed to put parameter
 #
 # Example:
-#   put_ssm_parameter "/sanofi/cronus/dev/video-calling-agent/api-key" "secret123" "SecureString"
+#   put_ssm_parameter "/customer/project/dev/application-agent/api-key" "secret123" "SecureString"
 #
 put_ssm_parameter() {
   local parameter_name="$1"
@@ -937,7 +937,7 @@ put_ssm_parameter() {
 # Lists all parameters under a given path
 #
 # Arguments:
-#   $1 - Base path (e.g., /sanofi/cronus/dev/video-calling)
+#   $1 - Base path (e.g., /customer/project/dev/application)
 #   $2 - (optional) Recursive (true/false, default: true)
 #   $3 - (optional) With decryption (true/false, default: true)
 #   $4 - (optional) AWS region (defaults to get_aws_region)
@@ -951,7 +951,7 @@ put_ssm_parameter() {
 #   [{"Name": "/path/to/param", "Value": "decrypted_value"}, ...]
 #
 # Example:
-#   params=$(list_ssm_parameters_by_path "/sanofi/cronus/dev/video-calling" "true" "true")
+#   params=$(list_ssm_parameters_by_path "/customer/project/dev/application" "true" "true")
 #   echo "$params" | jq -r '.[] | "\(.Name)=\(.Value)"'
 #
 list_ssm_parameters_by_path() {
@@ -1022,7 +1022,7 @@ list_ssm_parameters_by_path() {
 #   1 - Failed to delete parameter
 #
 # Example:
-#   delete_ssm_parameter "/sanofi/cronus/dev/video-calling/app/port"
+#   delete_ssm_parameter "/customer/project/dev/application/app/port"
 #
 delete_ssm_parameter() {
   local parameter_name="$1"
@@ -1064,7 +1064,7 @@ delete_ssm_parameter() {
 #   1 - Failed to discover RDS instance
 #
 # Example:
-#   rds_info=$(discover_rds_instance "sanofi-cronus-prod-db")
+#   rds_info=$(discover_rds_instance "customer-project-prod-db")
 #   endpoint=$(echo "$rds_info" | jq -r '.endpoint')
 #   port=$(echo "$rds_info" | jq -r '.port')
 #
@@ -1125,7 +1125,7 @@ discover_rds_instance() {
 #   }
 #
 # Example:
-#   cluster_info=$(discover_eks_cluster "sanofi-cronus-prod-eks" "eu-central-1")
+#   cluster_info=$(discover_eks_cluster "customer-project-prod-eks" "eu-central-1")
 #
 discover_eks_cluster() {
   local cluster_name="$1"
@@ -1190,7 +1190,7 @@ discover_eks_cluster() {
 #   JSON with cluster info
 #
 # Example:
-#   cluster_info=$(discover_eks_cluster_by_naming_convention "sanofi" "cronus" "dev")
+#   cluster_info=$(discover_eks_cluster_by_naming_convention "customer" "project" "dev")
 #
 discover_eks_cluster_by_naming_convention() {
   local customer="$1"
@@ -1241,7 +1241,7 @@ discover_eks_cluster_by_naming_convention() {
 #   ARN of OIDC provider
 #
 # Example:
-#   oidc_arn=$(get_eks_oidc_provider_arn "sanofi-cronus-prod-eks")
+#   oidc_arn=$(get_eks_oidc_provider_arn "customer-project-prod-eks")
 #
 get_eks_oidc_provider_arn() {
   local cluster_name="$1"
@@ -1290,7 +1290,7 @@ get_eks_oidc_provider_arn() {
 #   1 - VPC endpoint not found
 #
 # Example:
-#   if verify_vpc_endpoint_sqs "sanofi" "cronus"; then
+#   if verify_vpc_endpoint_sqs "customer" "project"; then
 #     log_info "SQS VPC endpoint available"
 #   fi
 #
@@ -1332,7 +1332,7 @@ verify_vpc_endpoint_sqs() {
 #   VPC endpoint ID (e.g., "vpce-1234567890abcdef0")
 #
 # Example:
-#   endpoint_id=$(get_vpc_endpoint_id "sanofi-cronus-sqs-vpce")
+#   endpoint_id=$(get_vpc_endpoint_id "customer-project-sqs-vpce")
 #
 get_vpc_endpoint_id() {
   local endpoint_name="$1"
@@ -1373,7 +1373,7 @@ get_vpc_endpoint_id() {
 #   JSON: {"url": "...", "arn": "...", "attributes": {...}}
 #
 # Example:
-#   queue_info=$(discover_queue_by_name "sanofi-cronus-prod-events.fifo")
+#   queue_info=$(discover_queue_by_name "customer-project-prod-events.fifo")
 #
 discover_queue_by_name() {
   local queue_name="$1"
@@ -1423,7 +1423,7 @@ discover_queue_by_name() {
 #   1 - Queue does not exist
 #
 # Example:
-#   if queue_exists "sanofi-cronus-prod-events.fifo"; then
+#   if queue_exists "customer-project-prod-events.fifo"; then
 #     log_info "Queue exists"
 #   fi
 #
@@ -1455,8 +1455,8 @@ queue_exists() {
 #   Key ID if found, empty string otherwise
 #
 # Example:
-#   key_id=$(discover_kms_key_by_alias "alias/sanofi/cronus/dev/video-calling/encryption")
-#   key_id=$(discover_kms_key_by_alias "sanofi/cronus/dev/video-calling/encryption")
+#   key_id=$(discover_kms_key_by_alias "alias/customer/project/dev/application/encryption")
+#   key_id=$(discover_kms_key_by_alias "customer/project/dev/application/encryption")
 #
 discover_kms_key_by_alias() {
   local alias_name="$1"
@@ -1499,7 +1499,7 @@ discover_kms_key_by_alias() {
 #   JSON array of key metadata
 #
 # Example:
-#   keys=$(list_kms_keys_by_service "sanofi" "cronus" "dev" "video-calling")
+#   keys=$(list_kms_keys_by_service "customer" "project" "dev" "application")
 #
 list_kms_keys_by_service() {
   local customer="$1"
@@ -1533,7 +1533,7 @@ list_kms_keys_by_service() {
 #   Key ARN if found, empty string otherwise
 #
 # Example:
-#   arn=$(get_kms_key_arn "alias/sanofi/cronus/dev/video-calling/encryption")
+#   arn=$(get_kms_key_arn "alias/customer/project/dev/application/encryption")
 #   arn=$(get_kms_key_arn "e80dc880-d391-4f52-b7d1-3bc2cfa0f288")
 #
 get_kms_key_arn() {
@@ -1564,7 +1564,7 @@ get_kms_key_arn() {
 #   1 - Key does not exist
 #
 # Example:
-#   if kms_key_exists "alias/sanofi/cronus/dev/video-calling/encryption"; then
+#   if kms_key_exists "alias/customer/project/dev/application/encryption"; then
 #     log_info "Key exists"
 #   fi
 #
@@ -1597,7 +1597,7 @@ kms_key_exists() {
 #   JSON object with key metadata
 #
 # Example:
-#   metadata=$(get_kms_key_metadata "alias/sanofi/cronus/dev/video-calling/encryption")
+#   metadata=$(get_kms_key_metadata "alias/customer/project/dev/application/encryption")
 #   key_state=$(echo "$metadata" | jq -r '.KeyMetadata.KeyState')
 #
 get_kms_key_metadata() {

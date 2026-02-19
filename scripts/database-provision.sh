@@ -28,9 +28,9 @@
 #   - Idempotent operations (safe to re-run)
 #
 # Usage:
-#   ./database-provision.sh --customer sanofi --project cronus --environment prod --service videocalling
-#   ./database-provision.sh --customer sanofi --project cronus --environment prod --service videocalling --db-custom-suffix recordings
-#   ./database-provision.sh --customer sanofi --project cronus --environment prod --service videocalling --dry-run
+#   ./database-provision.sh --customer customer --project project --environment prod --service videocalling
+#   ./database-provision.sh --customer customer --project project --environment prod --service videocalling --db-custom-suffix recordings
+#   ./database-provision.sh --customer customer --project project --environment prod --service videocalling --dry-run
 # ==============================================================================
 
 set -euo pipefail
@@ -115,8 +115,8 @@ USAGE:
   ${SCRIPT_NAME} [OPTIONS]
 
 REQUIRED OPTIONS:
-  --customer CUSTOMER         Customer name (e.g., sanofi)
-  --project PROJECT           Project name (e.g., cronus)
+  --customer CUSTOMER         Customer name (e.g., customer)
+  --project PROJECT           Project name (e.g., project)
   --environment ENVIRONMENT   Environment (e.g., prod, dev)
   --service SERVICE           Service name (e.g., videocalling)
 
@@ -146,19 +146,19 @@ OPTIONAL OPTIONS:
 
 EXAMPLES:
   # Provision main database with IAM user
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling
 
   # Provision additional database (reuses existing IAM user)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --db-custom-suffix recordings
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --db-custom-suffix recordings
 
   # Dry-run mode
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --dry-run
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --dry-run
 
   # Verbose logging
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --verbose
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --verbose
 
   # Override RDS instance discovery (use specific RDS instance)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --rds-instance-id indegene
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --rds-instance-id indegene
 
 NOTES:
   - Idempotent: Safe to run multiple times

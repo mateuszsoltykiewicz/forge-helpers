@@ -18,19 +18,19 @@
 #
 # Examples:
 #   # Create ECR repository for dev environment
-#   ./ecr.sh --customer sanofi --project cronus --service-name video-calling \
+#   ./ecr.sh --customer customer --project project --service-name application \
 #            --environment dev --cluster-name indegene-eks
 #
 #   # Create for multiple environments
-#   ./ecr.sh --customer sanofi --project cronus --service-name video-calling \
+#   ./ecr.sh --customer customer --project project --service-name application \
 #            --environment dev,staging,prod --cluster-name indegene-eks
 #
 #   # Delete ECR repository
-#   ./ecr.sh --customer sanofi --project cronus --service-name video-calling \
+#   ./ecr.sh --customer customer --project project --service-name application \
 #            --environment dev --cluster-name indegene-eks --delete
 #
 #   # Dry-run (preview changes)
-#   ./ecr.sh --customer sanofi --project cronus --service-name video-calling \
+#   ./ecr.sh --customer customer --project project --service-name application \
 #            --environment dev --cluster-name indegene-eks --dry-run
 #
 # ==============================================================================
@@ -129,9 +129,9 @@ print_usage() {
 Usage: ${SCRIPT_NAME} [OPTIONS]
 
 REQUIRED ARGUMENTS:
-  --customer CUSTOMER           Customer name (e.g., sanofi, indegene)
-  --project PROJECT             Project name (e.g., cronus, platform)
-  --service-name SERVICE        Service name (e.g., video-calling, api-gateway)
+  --customer CUSTOMER           Customer name (e.g., customer, indegene)
+  --project PROJECT             Project name (e.g., project, platform)
+  --service-name SERVICE        Service name (e.g., application, api-gateway)
   --environment ENV             Environment (dev, staging, prod, or comma-separated)
   --cluster-name CLUSTER        EKS cluster name (for IAM policy)
 
@@ -154,41 +154,41 @@ IMAGE OPERATIONS:
 
 EXAMPLES:
   # Create ECR repository for dev environment
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks
 
   # Create for multiple environments
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev,staging,prod --cluster-name indegene-eks
 
   # Delete ECR repository
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks --delete
 
   # Dry-run preview
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks --dry-run
 
   # Use custom AWS profile and region
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment prod --cluster-name prod-cluster \\
                  --aws-profile production --aws-region us-east-1
 
   # Wipe all images from repository
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks --wipe-images
 
   # Delete specific image by tag
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks --delete-image 65a945c
 
   # Check if image exists
-  ${SCRIPT_NAME} --customer sanofi --project cronus --service-name video-calling \\
+  ${SCRIPT_NAME} --customer customer --project project --service-name application \\
                  --environment dev --cluster-name indegene-eks --image-exists 65a945c
 
 REPOSITORY NAMING:
   Format: {customer}/{project}/{environment}/{service}
-  Example: sanofi/cronus/dev/video-calling
+  Example: customer/project/dev/application
 
 POLICIES APPLIED:
   - EKS cluster access policy (restricts pull to specific cluster)

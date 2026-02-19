@@ -6,8 +6,8 @@ REGION="eu-central-1"
 ENVIRONMENTS=("dev" "staging" "prod")
 
 for ENV in "${ENVIRONMENTS[@]}"; do
-  BUCKET_NAME="sanofi-cronus-${ENV}-video-calling-recordings"
-  USER_NAME="SanofiCronus${ENV}VideoCallingRecordingsRole"  # IAM user (naming convention with "Role")
+  BUCKET_NAME="customer-project-${ENV}-application-recordings"
+  USER_NAME="customerproject${ENV}VideoCallingRecordingsRole"  # IAM user (naming convention with "Role")
   POLICY_NAME="${USER_NAME}Policy"
 
   echo "=== Processing environment: $ENV ==="

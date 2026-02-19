@@ -147,14 +147,14 @@ ENVIRONMENT VARIABLES:
 
 EXAMPLES:
   # Minimal (auto-detect service and region)
-  export FORGE_CUSTOMER=sanofi FORGE_PROJECT=cronus FORGE_ENVIRONMENT=dev
+  export FORGE_CUSTOMER=customer FORGE_PROJECT=project FORGE_ENVIRONMENT=dev
   $SCRIPT_NAME
 
   # Explicit all parameters
-  $SCRIPT_NAME --customer sanofi --project cronus --service-name video-calling-agent --environment dev
+  $SCRIPT_NAME --customer customer --project project --service-name application-agent --environment dev
 
   # With retries
-  $SCRIPT_NAME --customer sanofi --project cronus --environment dev --build-retries 5 --push-retries 5
+  $SCRIPT_NAME --customer customer --project project --environment dev --build-retries 5 --push-retries 5
 
 EXIT CODES:
   0=Success, 1=General error, 2=Invalid args, 3=AWS/ECR error,

@@ -361,7 +361,7 @@ execute_sql() {
 #   1 - Failed to retrieve password
 #
 # Example:
-#   password=$(get_database_password_from_ssm "/rds/sanofi/cronus/prod/db/password")
+#   password=$(get_database_password_from_ssm "/rds/customer/project/prod/db/password")
 #
 get_database_password_from_ssm() {
   local ssm_path="$1"

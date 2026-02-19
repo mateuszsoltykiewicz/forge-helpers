@@ -341,9 +341,9 @@ DESCRIPTION:
   Pod Security Standards, and resource quotas/limits from YAML configuration.
 
 REQUIRED ARGUMENTS:
-  --customer CUSTOMER           Customer name (e.g., sanofi, indegene)
-  --project PROJECT             Project name (e.g., cronus, platform)
-  --service-name SERVICE        Service name (e.g., video-calling, api-gateway)
+  --customer CUSTOMER           Customer name (e.g., customer, indegene)
+  --project PROJECT             Project name (e.g., project, platform)
+  --service-name SERVICE        Service name (e.g., application, api-gateway)
   --environment ENV             Environment (dev, staging, prod, or comma-separated)
   --config-path PATH            Path to YAML configuration file (not required for delete)
 
@@ -411,7 +411,7 @@ YAML CONFIGURATION FILE:
 NAMING CONVENTION:
   Namespace: {customer}-{project}-{environment}-{service}
   
-  Example: sanofi-cronus-dev-video-calling
+  Example: customer-project-dev-application
 
 FORGE LABELS:
   app.kubernetes.io/name: {service}
@@ -427,26 +427,26 @@ EXAMPLES:
   # Create namespace with auto-discovery (v3.0.0 - Recommended)
   # Auto-detects execution mode and discovers EKS cluster
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --config-path ./namespace-config.yaml
 
   # Create namespace with explicit context
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --config-path ./namespace-config.yaml \\
     --context indegene-eks
 
   # Create namespace with explicit kubeconfig and context
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --config-path ./namespace-config.yaml \\
     --kubeconfig ~/.kube/config \\
@@ -454,43 +454,43 @@ EXAMPLES:
 
   # Create multiple environments
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev,staging,prod \\
     --config-path ./namespace-config.yaml
 
   # Delete namespace with dry-run
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --delete \\
     --dry-run
 
   # Delete namespace (with confirmation)
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --delete
 
   # Custom PSS levels
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment prod \\
     --config-path ./namespace-config.yaml \\
     --pss-enforce restricted
 
   # Override namespace name
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --config-path ./namespace-config.yaml \\
     --namespace custom-namespace-name

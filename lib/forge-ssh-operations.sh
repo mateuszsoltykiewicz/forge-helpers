@@ -185,8 +185,8 @@ generate_ssh_key() {
 #   - For SSM push, use setup_complete_git_ssh_environment() with push_to_ssm=true
 #
 # Example:
-#   generate_and_install_ssh_key "sanofi" "cronus" "dev" "video-calling-agent"
-#   # Creates: ~/.ssh/SanofiCronusDevVideoCallingAgentBuildSshKey
+#   generate_and_install_ssh_key "customer" "project" "dev" "application-agent"
+#   # Creates: ~/.ssh/customerprojectDevVideoCallingAgentBuildSshKey
 generate_and_install_ssh_key() {
     local customer="$1"
     local project="$2"
@@ -1134,10 +1134,10 @@ ensure_github_known_hosts() {
 #
 # Example:
 #   # Local-only (default)
-#   setup_complete_git_ssh_environment "sanofi" "cronus" "dev" "video-calling-agent"
+#   setup_complete_git_ssh_environment "customer" "project" "dev" "application-agent"
 #
 #   # Local + SSM backup
-#   setup_complete_git_ssh_environment "sanofi" "cronus" "dev" "video-calling-agent" \
+#   setup_complete_git_ssh_environment "customer" "project" "dev" "application-agent" \
 #       "ed25519" "github.com" "false" "true" "eu-central-1"
 setup_complete_git_ssh_environment() {
     local customer="$1"

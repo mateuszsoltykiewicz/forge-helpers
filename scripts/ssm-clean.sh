@@ -9,7 +9,7 @@
 #                  --service <name> [--section <name>] [--dry-run] [--force]
 #
 # Example:
-#   ./ssm-clean.sh --customer sanofi --project cronus --environment dev \
+#   ./ssm-clean.sh --customer customer --project project --environment dev \
 #                  --service test-1 --section database --dry-run
 # ==============================================================================
 
@@ -61,8 +61,8 @@ Usage:
                    --service <name> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
   --service <name>         Service name (e.g., test-1)
 
@@ -76,19 +76,19 @@ Optional Arguments:
 
 Examples:
   # Delete all parameters (with confirmation)
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1
 
   # Delete specific section
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --section database
 
   # Dry-run mode
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --dry-run
 
   # Force deletion without confirmation
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --force
 
 Exit Codes:

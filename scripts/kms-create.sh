@@ -9,8 +9,8 @@
 #                   --service <name> --purpose <purpose> [--dry-run]
 #
 # Example:
-#   ./kms-create.sh --customer sanofi --project cronus --environment dev \
-#                   --service video-calling --purpose encryption
+#   ./kms-create.sh --customer customer --project project --environment dev \
+#                   --service application --purpose encryption
 # ==============================================================================
 
 set -euo pipefail
@@ -60,10 +60,10 @@ Usage:
                    --service <name> --purpose <purpose> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
-  --service <name>         Service name (e.g., video-calling)
+  --service <name>         Service name (e.g., application)
   --purpose <purpose>      Key purpose (e.g., encryption, signing, data, secrets)
 
 Optional Arguments:
@@ -80,13 +80,13 @@ Key Naming Convention:
   alias/{customer}/{project}/{environment}/{service}/{purpose}
 
 Examples:
-  # Create encryption key for video-calling service
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service video-calling --purpose encryption
+  # Create encryption key for application service
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service application --purpose encryption
 
   # Dry-run mode
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service video-calling --purpose data --dry-run
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service application --purpose data --dry-run
 
 Key Purposes:
   - encryption:  General data encryption (ENCRYPT_DECRYPT)

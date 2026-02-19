@@ -118,11 +118,11 @@ get_irsa_role_name() {
   local project="$2"
   local env="$3"
   local service="$4"
-  # Convert to PascalCase: SanofiCronusDevVideoCallingIrsa
+  # Convert to PascalCase: customerprojectDevVideoCallingIrsa
   local customer_pascal=$(echo "$customer" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
   local project_pascal=$(echo "$project" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
   local env_pascal=$(echo "$env" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
-  # Handle hyphenated service names: video-calling -> VideoCalling
+  # Handle hyphenated service names: application -> VideoCalling
   local service_pascal=$(echo "$service" | awk -F'-' '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2))}')
   echo "${customer_pascal}${project_pascal}${env_pascal}${service_pascal}Irsa"
 }
@@ -178,9 +178,9 @@ DESCRIPTION:
   Configures OIDC trust policies and attaches IAM policies for EKS workloads.
 
 REQUIRED ARGUMENTS:
-  --customer CUSTOMER           Customer name (e.g., sanofi)
-  --project PROJECT             Project name (e.g., cronus)
-  --service-name SERVICE        Service name (e.g., video-calling)
+  --customer CUSTOMER           Customer name (e.g., customer)
+  --project PROJECT             Project name (e.g., project)
+  --service-name SERVICE        Service name (e.g., application)
   --environment ENVIRONMENT     Environment (e.g., dev, staging, prod)
   --cluster-name CLUSTER        EKS cluster name
 
@@ -202,37 +202,37 @@ OPTIONAL ARGUMENTS:
 EXAMPLES:
   # Basic usage
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --cluster-name indegene-eks \\
-    --policy-file ./policies/video-calling-policy.json
+    --policy-file ./policies/application-policy.json
 
   # With AWS profile
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment prod \\
     --cluster-name indegene-eks \\
-    --policy-file ./policies/video-calling-policy.json \\
+    --policy-file ./policies/application-policy.json \\
     --aws-profile production
 
   # Delete IAM role and policy
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --cluster-name indegene-eks \\
     --delete
 
   # Delete with dry-run
   $SCRIPT_NAME \\
-    --customer sanofi \\
-    --project cronus \\
-    --service-name video-calling \\
+    --customer customer \\
+    --project project \\
+    --service-name application \\
     --environment dev \\
     --cluster-name indegene-eks \\
     --delete \\
@@ -244,7 +244,7 @@ NAMING CONVENTION:
   ServiceAccount: {customer}-{project}-{env}-{service}-sa
   Namespace:      {customer}-{project}-{env}-{service}
 
-  Example: SanofiCronusDevVideoCallingIrsa
+  Example: customerprojectDevVideoCallingIrsa
 
 EXIT CODES:
   0 - Success

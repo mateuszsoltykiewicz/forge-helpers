@@ -216,8 +216,8 @@ class AWSSecurityGroupClient:
         Discover VPC ID by tags (Customer, Project, Region, Environment).
         
         Args:
-            customer: Customer tag value (e.g., 'Sanofi')
-            project: Project tag value (e.g., 'Cronus')
+            customer: Customer tag value (e.g., 'customer')
+            project: Project tag value (e.g., 'project')
             region: Region tag value (e.g., 'us-east-2')
             environment: Environment tag value (e.g., 'shared', 'production')
             current_deployment: Optional CurrentDeployment tag for fallback filtering (e.g., 'Primary')

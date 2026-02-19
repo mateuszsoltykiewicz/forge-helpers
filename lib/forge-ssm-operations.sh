@@ -72,7 +72,7 @@ validate_required_commands aws jq yq
 #   1 - Error
 #
 # Example:
-#   params=$(parse_yaml_to_ssm_format "vault.yaml" "sanofi" "cronus" "dev" "test-1")
+#   params=$(parse_yaml_to_ssm_format "vault.yaml" "customer" "project" "dev" "test-1")
 #
 parse_yaml_to_ssm_format() {
   local yaml_file="$1"
@@ -152,7 +152,7 @@ parse_yaml_to_ssm_format() {
 #   1 - Error
 #
 # Example:
-#   push_yaml_to_ssm "vault.yaml" "sanofi" "cronus" "dev" "test-1" "false"
+#   push_yaml_to_ssm "vault.yaml" "customer" "project" "dev" "test-1" "false"
 #
 push_yaml_to_ssm() {
   local yaml_file="$1"
@@ -255,7 +255,7 @@ push_yaml_to_ssm() {
 #   1 - Error
 #
 # Example:
-#   pull_ssm_to_yaml "sanofi" "cronus" "dev" "test-1" "/tmp/sanofi-cronus-dev-test-1.yaml"
+#   pull_ssm_to_yaml "customer" "project" "dev" "test-1" "/tmp/customer-project-dev-test-1.yaml"
 #
 pull_ssm_to_yaml() {
   local customer="$1"
@@ -386,7 +386,7 @@ EOF
 #   1 - Error
 #
 # Example:
-#   sections=$(list_ssm_sections "sanofi" "cronus" "dev" "test-1")
+#   sections=$(list_ssm_sections "customer" "project" "dev" "test-1")
 #
 list_ssm_sections() {
   local customer="$1"
@@ -438,7 +438,7 @@ list_ssm_sections() {
 #   1 - Error
 #
 # Example:
-#   delete_ssm_section "sanofi" "cronus" "dev" "test-1" "app" "false"
+#   delete_ssm_section "customer" "project" "dev" "test-1" "app" "false"
 #
 delete_ssm_section() {
   local customer="$1"
@@ -528,7 +528,7 @@ delete_ssm_section() {
 #   Reports added, updated, unchanged, and orphaned parameters
 #
 # Example:
-#   sync_yaml_to_ssm "vault.yaml" "sanofi" "cronus" "dev" "test-1" "false"
+#   sync_yaml_to_ssm "vault.yaml" "customer" "project" "dev" "test-1" "false"
 #
 sync_yaml_to_ssm() {
   local yaml_file="$1"

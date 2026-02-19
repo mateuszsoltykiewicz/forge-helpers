@@ -25,7 +25,7 @@
 #
 # Usage:
 #   source /path/to/forge-vault-operations.sh
-#   delete_vault_secret "secret/data/sanofi/cronus/dev/service/app"
+#   delete_vault_secret "secret/data/customer/project/dev/service/app"
 #   create_vault_policy "my-policy" "path \"secret/data/*\" { capabilities = [\"read\"] }"
 #   create_vault_role "my-role" "my-namespace" "my-service-account" "my-policy" "24h"
 # ==============================================================================
@@ -76,8 +76,8 @@ validate_required_commands vault jq
 # Arguments:
 #   $1 - secret_path: Full path to secret (can be metadata or data path)
 #        Examples: 
-#          - secret/data/sanofi/cronus/dev/video-calling/app
-#          - secret/sanofi/cronus/dev/video-calling/app (will be converted)
+#          - secret/data/customer/project/dev/application/app
+#          - secret/customer/project/dev/application/app (will be converted)
 #
 # Environment Variables:
 #   VAULT_ADDR - Vault server address (required)
@@ -92,8 +92,8 @@ validate_required_commands vault jq
 #   Logs deletion status to stderr
 #
 # Example:
-#   delete_vault_secret "secret/data/sanofi/cronus/dev/video-calling/app"
-#   delete_vault_secret "secret/sanofi/cronus/dev/video-calling/app"
+#   delete_vault_secret "secret/data/customer/project/dev/application/app"
+#   delete_vault_secret "secret/customer/project/dev/application/app"
 #
 delete_vault_secret() {
   local secret_path="$1"
@@ -133,7 +133,7 @@ delete_vault_secret() {
 #
 # Arguments:
 #   $1 - base_path: Base path to list from
-#        Example: secret/sanofi/cronus/dev
+#        Example: secret/customer/project/dev
 #   $2 - recursive: "true" or "false" (default: "false")
 #
 # Environment Variables:
@@ -149,13 +149,13 @@ delete_vault_secret() {
 #   List of secret paths to stdout (one per line)
 #
 # Example:
-#   list_vault_secrets "secret/sanofi/cronus/dev" "false"
+#   list_vault_secrets "secret/customer/project/dev" "false"
 #   # Output:
-#   # secret/sanofi/cronus/dev/video-calling/app
-#   # secret/sanofi/cronus/dev/video-calling/livekit
+#   # secret/customer/project/dev/application/app
+#   # secret/customer/project/dev/application/livekit
 #
-#   list_vault_secrets "secret/sanofi/cronus" "true"
-#   # Recursively lists all secrets under sanofi/cronus/*
+#   list_vault_secrets "secret/customer/project" "true"
+#   # Recursively lists all secrets under customer/project/*
 #
 list_vault_secrets() {
   local base_path="$1"
@@ -228,7 +228,7 @@ list_vault_secrets() {
 #   None (silent check)
 #
 # Example:
-#   if check_vault_secret_exists "secret/sanofi/cronus/dev/video-calling/app"; then
+#   if check_vault_secret_exists "secret/customer/project/dev/application/app"; then
 #     echo "Secret exists"
 #   fi
 #
@@ -275,7 +275,7 @@ check_vault_secret_exists() {
 #   JSON metadata to stdout
 #
 # Example:
-#   metadata=$(get_vault_secret_metadata "secret/sanofi/cronus/dev/video-calling/app")
+#   metadata=$(get_vault_secret_metadata "secret/customer/project/dev/application/app")
 #   echo "$metadata" | jq '.current_version'
 #
 get_vault_secret_metadata() {
@@ -314,7 +314,7 @@ get_vault_secret_metadata() {
 #   1 - Error
 #
 # Example:
-#   bulk_write_vault_secrets "secret/sanofi/cronus/dev/video-calling" \
+#   bulk_write_vault_secrets "secret/customer/project/dev/application" \
 #     "app/PORT=3000" \
 #     "app/HOST=0.0.0.0" \
 #     "livekit/API_KEY=abc123"
@@ -393,8 +393,8 @@ bulk_write_vault_secrets() {
 #
 # Example:
 #   bulk_delete_vault_secrets \
-#     "secret/sanofi/cronus/dev/video-calling/app" \
-#     "secret/sanofi/cronus/dev/video-calling/livekit"
+#     "secret/customer/project/dev/application/app" \
+#     "secret/customer/project/dev/application/livekit"
 #
 bulk_delete_vault_secrets() {
   validate_required_vars VAULT_ADDR VAULT_TOKEN
@@ -443,13 +443,13 @@ bulk_delete_vault_secrets() {
 #   2 - Vault API error
 #
 # Example:
-#   policy_hcl='path "secret/data/sanofi/cronus/dev/*" {
+#   policy_hcl='path "secret/data/customer/project/dev/*" {
 #     capabilities = ["create", "read", "update", "delete", "list"]
 #   }'
-#   create_vault_policy "sanofi-cronus-dev-video-calling-policy" "$policy_hcl"
+#   create_vault_policy "customer-project-dev-application-policy" "$policy_hcl"
 #
 #   # Or using forge-patterns naming:
-#   policy_name=$(get_vault_policy_name "sanofi" "cronus" "dev" "video-calling")
+#   policy_name=$(get_vault_policy_name "customer" "project" "dev" "application")
 #   create_vault_policy "$policy_name" "$policy_hcl"
 #
 create_vault_policy() {
@@ -515,7 +515,7 @@ update_vault_policy() {
 #   2 - Vault API error
 #
 # Example:
-#   delete_vault_policy "sanofi-cronus-dev-video-calling-policy"
+#   delete_vault_policy "customer-project-dev-application-policy"
 #
 delete_vault_policy() {
   local policy_name="$1"
@@ -560,7 +560,7 @@ delete_vault_policy() {
 #   # Output:
 #   # default
 #   # root
-#   # sanofi-cronus-dev-video-calling-policy
+#   # customer-project-dev-application-policy
 #
 list_vault_policies() {
   validate_required_vars VAULT_ADDR VAULT_TOKEN
@@ -586,7 +586,7 @@ list_vault_policies() {
 #   Policy content in HCL format to stdout
 #
 # Example:
-#   get_vault_policy "sanofi-cronus-dev-video-calling-policy"
+#   get_vault_policy "customer-project-dev-application-policy"
 #
 get_vault_policy() {
   local policy_name="$1"
@@ -603,7 +603,7 @@ get_vault_policy() {
 # This is a helper function to generate policy HCL programmatically.
 #
 # Arguments:
-#   $1 - base_path: Base path for the policy (e.g., "secret/data/sanofi/cronus/dev/video-calling")
+#   $1 - base_path: Base path for the policy (e.g., "secret/data/customer/project/dev/application")
 #   $2 - capabilities: Comma-separated capabilities (e.g., "create,read,update,delete,list")
 #
 # Returns:
@@ -613,7 +613,7 @@ get_vault_policy() {
 #   Policy HCL to stdout
 #
 # Example:
-#   policy_hcl=$(generate_vault_policy_hcl "secret/data/sanofi/cronus/dev/video-calling" "read,list")
+#   policy_hcl=$(generate_vault_policy_hcl "secret/data/customer/project/dev/application" "read,list")
 #   create_vault_policy "my-policy" "$policy_hcl"
 #
 generate_vault_policy_hcl() {
@@ -664,17 +664,17 @@ EOF
 #
 # Example:
 #   create_vault_role \
-#     "sanofi-cronus-dev-video-calling-role" \
-#     "sanofi-cronus-dev-video-calling-agent" \
-#     "sanofi-cronus-dev-video-calling-agent-sa" \
-#     "sanofi-cronus-dev-video-calling-policy" \
+#     "customer-project-dev-application-role" \
+#     "customer-project-dev-application-agent" \
+#     "customer-project-dev-application-agent-sa" \
+#     "customer-project-dev-application-policy" \
 #     "24h"
 #
 #   # Or using forge-patterns:
-#   role_name=$(get_vault_role_name "sanofi" "cronus" "dev" "video-calling")
-#   namespace=$(get_namespace_name "sanofi" "cronus" "dev" "video-calling")
-#   sa_name=$(get_service_account_name "sanofi" "cronus" "dev" "video-calling")
-#   policy_name=$(get_vault_policy_name "sanofi" "cronus" "dev" "video-calling")
+#   role_name=$(get_vault_role_name "customer" "project" "dev" "application")
+#   namespace=$(get_namespace_name "customer" "project" "dev" "application")
+#   sa_name=$(get_service_account_name "customer" "project" "dev" "application")
+#   policy_name=$(get_vault_policy_name "customer" "project" "dev" "application")
 #   create_vault_role "$role_name" "$namespace" "$sa_name" "$policy_name" "24h"
 #
 create_vault_role() {
@@ -741,7 +741,7 @@ update_vault_role() {
 #   1 - Error
 #
 # Example:
-#   delete_vault_role "sanofi-cronus-dev-video-calling-role"
+#   delete_vault_role "customer-project-dev-application-role"
 #
 delete_vault_role() {
   local role_name="$1"
@@ -815,7 +815,7 @@ list_vault_roles() {
 #   Role configuration in JSON format to stdout
 #
 # Example:
-#   get_vault_role "sanofi-cronus-dev-video-calling-role"
+#   get_vault_role "customer-project-dev-application-role"
 #
 get_vault_role() {
   local role_name="$1"
@@ -951,7 +951,7 @@ enable_k8s_auth_backend() {
 #
 # Arguments:
 #   $1 - ssm_prefix: SSM parameter path prefix
-#        Example: /sanofi/cronus/dev/video-calling
+#        Example: /customer/project/dev/application
 #
 # Returns:
 #   0 - Success
@@ -961,7 +961,7 @@ enable_k8s_auth_backend() {
 #   List of section names to stdout (one per line)
 #
 # Example:
-#   discover_ssm_sections "/sanofi/cronus/dev/video-calling"
+#   discover_ssm_sections "/customer/project/dev/application"
 #   # Output:
 #   # app
 #   # livekit
@@ -1012,8 +1012,8 @@ discover_ssm_sections() {
 #
 # Example:
 #   sync_ssm_section_to_vault \
-#     "/sanofi/cronus/dev/video-calling" \
-#     "secret/sanofi/cronus/dev/video-calling" \
+#     "/customer/project/dev/application" \
+#     "secret/customer/project/dev/application" \
 #     "app"
 #
 sync_ssm_section_to_vault() {
@@ -1093,8 +1093,8 @@ sync_ssm_section_to_vault() {
 #
 # Example:
 #   orphans=$(detect_orphaned_vault_secrets \
-#     "secret/sanofi/cronus/dev/video-calling" \
-#     "/sanofi/cronus/dev/video-calling")
+#     "secret/customer/project/dev/application" \
+#     "/customer/project/dev/application")
 #
 detect_orphaned_vault_secrets() {
   local vault_base_path="$1"

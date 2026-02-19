@@ -17,7 +17,7 @@
 #
 # Usage:
 #   source /path/to/forge-sqs-operations.sh
-#   create_kms_key_for_sqs "sanofi" "cronus" "prod"
+#   create_kms_key_for_sqs "customer" "project" "prod"
 #   create_fifo_queue "my-queue.fifo" "$kms_key_id"
 # ==============================================================================
 
@@ -129,7 +129,7 @@ check_jq_installed() {
 #   KMS Key ID (stdout)
 #
 # Example:
-#   key_id=$(create_kms_key_for_sqs "sanofi" "cronus" "prod")
+#   key_id=$(create_kms_key_for_sqs "customer" "project" "prod")
 #
 create_kms_key_for_sqs() {
   local customer="$1"
@@ -192,7 +192,7 @@ create_kms_key_for_sqs() {
 # Gets KMS key ID from alias
 #
 # Arguments:
-#   $1 - key_alias (e.g., "alias/sanofi-cronus-prod-sqs-key")
+#   $1 - key_alias (e.g., "alias/customer-project-prod-sqs-key")
 #   $2 - aws_region (optional)
 #
 # Returns:
@@ -203,7 +203,7 @@ create_kms_key_for_sqs() {
 #   KMS Key ID
 #
 # Example:
-#   key_id=$(get_kms_key_id "alias/sanofi-cronus-prod-sqs-key")
+#   key_id=$(get_kms_key_id "alias/customer-project-prod-sqs-key")
 #
 get_kms_key_id() {
   local key_alias="$1"
@@ -236,7 +236,7 @@ get_kms_key_id() {
 #   1 - Key does not exist
 #
 # Example:
-#   if kms_key_exists "alias/sanofi-cronus-prod-sqs-key"; then
+#   if kms_key_exists "alias/customer-project-prod-sqs-key"; then
 #     echo "Key exists"
 #   fi
 #
@@ -521,7 +521,7 @@ get_queue_attributes() {
 #
 # Example:
 #   policy=$(generate_merged_queue_policy "$queue_arn" \
-#     "video-calling:consumer:arn:aws:iam::123:role/Role1" \
+#     "application:consumer:arn:aws:iam::123:role/Role1" \
 #     "agent:producer:arn:aws:iam::123:role/Role2")
 #
 generate_merged_queue_policy() {
@@ -981,7 +981,7 @@ receive_test_message() {
 #   1 - Failed to store parameter
 #
 # Example:
-#   store_queue_url_in_ssm "/sqs/sanofi/cronus/prod/events/queue-url" "$queue_url"
+#   store_queue_url_in_ssm "/sqs/customer/project/prod/events/queue-url" "$queue_url"
 #
 store_queue_url_in_ssm() {
   local ssm_path="$1"
@@ -1006,7 +1006,7 @@ store_queue_url_in_ssm() {
 #   1 - Failed to store parameter
 #
 # Example:
-#   store_kms_key_id_in_ssm "/sqs/sanofi/cronus/prod/kms-key-id" "$kms_key_id"
+#   store_kms_key_id_in_ssm "/sqs/customer/project/prod/kms-key-id" "$kms_key_id"
 #
 store_kms_key_id_in_ssm() {
   local ssm_path="$1"

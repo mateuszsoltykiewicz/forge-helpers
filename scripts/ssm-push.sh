@@ -9,8 +9,8 @@
 #                 --service <name> --file <yaml-file> [--dry-run] [--type <String|SecureString>]
 #
 # Example:
-#   ./ssm-push.sh --customer sanofi --project cronus --environment dev \
-#                 --service test-1 --file /tmp/sanofi-cronus-dev-test-1.yaml
+#   ./ssm-push.sh --customer customer --project project --environment dev \
+#                 --service test-1 --file /tmp/customer-project-dev-test-1.yaml
 # ==============================================================================
 
 set -euo pipefail
@@ -61,8 +61,8 @@ Usage:
                    --service <name> --file <yaml-file> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
   --service <name>         Service name (e.g., test-1)
   --file <yaml-file>       Path to YAML configuration file
@@ -75,15 +75,15 @@ Optional Arguments:
 
 Examples:
   # Push configuration to SSM
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service test-1 --file /tmp/sanofi-cronus-dev-test-1.yaml
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service test-1 --file /tmp/customer-project-dev-test-1.yaml
 
   # Dry-run mode
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --file config.yaml --dry-run
 
   # Use String type instead of SecureString
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --file config.yaml --type String
 
 EOF

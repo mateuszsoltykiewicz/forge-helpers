@@ -570,7 +570,7 @@ mkdir -p ~/forge-test-sandbox
 cd ~/forge-test-sandbox
 
 # Copy helm chart for testing
-cp -r /Users/mateuszsoltykiewicz/Documents/video-calling-service/deployment/helm/service-chart ./test-app-chart
+cp -r /Users/mateuszsoltykiewicz/Documents/application-service/deployment/helm/service-chart ./test-app-chart
 
 # Modify values for test-1, test-2
 cat > test-1-values.yaml <<EOF

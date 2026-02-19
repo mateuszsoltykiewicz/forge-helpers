@@ -24,10 +24,10 @@
 #   - Exit codes: 0=success, 3=connection failed
 #
 # Usage (Kubernetes init container):
-#   ./database-verify.sh --customer sanofi --project cronus --environment prod --service videocalling --db-name mydb
+#   ./database-verify.sh --customer customer --project project --environment prod --service videocalling --db-name mydb
 #
 # Usage (manual testing):
-#   ./database-verify.sh --customer sanofi --project cronus --environment prod --service videocalling --db-name mydb --verbose
+#   ./database-verify.sh --customer customer --project project --environment prod --service videocalling --db-name mydb --verbose
 # ==============================================================================
 
 set -euo pipefail
@@ -115,8 +115,8 @@ USAGE:
   ${SCRIPT_NAME} [OPTIONS]
 
 REQUIRED OPTIONS:
-  --customer CUSTOMER         Customer name (e.g., sanofi)
-  --project PROJECT           Project name (e.g., cronus)
+  --customer CUSTOMER         Customer name (e.g., customer)
+  --project PROJECT           Project name (e.g., project)
   --environment ENVIRONMENT   Environment (e.g., prod, dev)
   --service SERVICE           Service name (e.g., videocalling)
   --db-name DB_NAME           Database name to connect to
@@ -156,18 +156,18 @@ EXIT CODES:
 
 EXAMPLES:
   # Basic usage (Kubernetes init container)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --db-name sanofi_cronus_prod_videocalling_db
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --db-name customer_project_prod_videocalling_db
 
   # With environment variables (Kubernetes ConfigMap)
-  export CUSTOMER=sanofi PROJECT=cronus ENVIRONMENT=prod SERVICE=videocalling
-  export DB_NAME=sanofi_cronus_prod_videocalling_db
+  export CUSTOMER=customer PROJECT=project ENVIRONMENT=prod SERVICE=videocalling
+  export DB_NAME=customer_project_prod_videocalling_db
   ${SCRIPT_NAME}
 
   # Manual testing with verbose output
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --db-name mydb --verbose
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --db-name mydb --verbose
 
   # Custom retry parameters
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment prod --service videocalling --db-name mydb --max-attempts 10 --retry-delay 5
+  ${SCRIPT_NAME} --customer customer --project project --environment prod --service videocalling --db-name mydb --max-attempts 10 --retry-delay 5
 
 NOTES:
   - Requires IRSA (IAM Roles for Service Accounts) in Kubernetes

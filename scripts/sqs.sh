@@ -17,19 +17,19 @@
 #   - SSM Parameter Store integration
 #
 # Usage:
-#   ./scripts/sqs.sh provision --customer sanofi --project cronus --environment prod \
-#     --purpose videocalling-events --service-names video-calling-api,video-calling-agent \
+#   ./scripts/sqs.sh provision --customer customer --project project --environment prod \
+#     --purpose videocalling-events --service-names application-api,application-agent \
 #     --access-type producer [--dry-run] [--verbose]
 #
-#   ./scripts/sqs.sh verify --customer sanofi --project cronus --environment prod \
+#   ./scripts/sqs.sh verify --customer customer --project project --environment prod \
 #     --purpose videocalling-events --access-type producer [--verbose]
 #
-#   ./scripts/sqs.sh delete --customer sanofi --project cronus --environment prod \
+#   ./scripts/sqs.sh delete --customer customer --project project --environment prod \
 #     --purpose videocalling-events [--delete-kms] [--dry-run] [--verbose]
 #
 # Naming Convention:
 #   Queue: {customer}-{project}-{environment}-{purpose}.fifo
-#   Example: sanofi-cronus-prod-videocalling-events.fifo
+#   Example: customer-project-prod-videocalling-events.fifo
 #
 # Requirements:
 #   - AWS CLI configured with appropriate credentials
@@ -121,15 +121,15 @@ Modes:
 
 Options:
     Required:
-        --customer <name>           Customer name (e.g., sanofi)
-        --project <name>            Project name (e.g., cronus)
+        --customer <name>           Customer name (e.g., customer)
+        --project <name>            Project name (e.g., project)
         --environment <name>        Environment name (e.g., dev, staging, prod)
         --purpose <name>            Queue purpose (e.g., videocalling-events)
         --service <name:access>     Service with access type (repeatable)
                                     Format: service-name:producer|consumer
                                     Examples:
-                                      --service video-calling-api:consumer
-                                      --service video-calling-agent:producer
+                                      --service application-api:consumer
+                                      --service application-agent:producer
                                     Required for provision mode (at least one)
 
     Optional:
@@ -154,27 +154,27 @@ Options:
 Examples:
     # Provision queue for producer service
     ${SCRIPT_NAME} provision \\
-        --customer sanofi \\
-        --project cronus \\
+        --customer customer \\
+        --project project \\
         --environment prod \\
         --purpose videocalling-events \\
-        --service-names video-calling-api \\
+        --service-names application-api \\
         --access-type producer \\
         --verbose
 
     # Provision queue for multiple consumer services
     ${SCRIPT_NAME} provision \\
-        --customer sanofi \\
-        --project cronus \\
+        --customer customer \\
+        --project project \\
         --environment prod \\
         --purpose videocalling-events \\
-        --service-names video-calling-agent,notification-service \\
+        --service-names application-agent,notification-service \\
         --access-type consumer
 
     # Verify queue access (dry-run)
     ${SCRIPT_NAME} verify \\
-        --customer sanofi \\
-        --project cronus \\
+        --customer customer \\
+        --project project \\
         --environment prod \\
         --purpose videocalling-events \\
         --access-type producer \\
@@ -182,8 +182,8 @@ Examples:
 
     # Delete queue and KMS key
     ${SCRIPT_NAME} delete \\
-        --customer sanofi \\
-        --project cronus \\
+        --customer customer \\
+        --project project \\
         --environment prod \\
         --purpose videocalling-events \\
         --delete-kms \\
@@ -191,15 +191,15 @@ Examples:
 
 Queue Naming:
     {customer}-{project}-{environment}-{purpose}.fifo
-    Example: sanofi-cronus-prod-videocalling-events.fifo
+    Example: customer-project-prod-videocalling-events.fifo
 
 IRSA Role Naming:
     {Customer}{Project}{Environment}{Service}Irsa (PascalCase)
-    Example: SanofiCronusProdVideoCallingApiIrsa
+    Example: customerprojectProdVideoCallingApiIrsa
 
 ServiceAccount Naming:
     {customer}-{project}-{environment}-{service}-sa (kebab-case)
-    Example: sanofi-cronus-prod-video-calling-api-sa
+    Example: customer-project-prod-application-api-sa
 
 Access Types:
     producer    - Grants SendMessage permission

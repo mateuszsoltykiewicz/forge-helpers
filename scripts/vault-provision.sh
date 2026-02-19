@@ -13,8 +13,8 @@
 # - Secret path initialization
 #
 # Usage:
-#   ./vault-provision.sh --customer sanofi --project cronus --environment dev --service video-calling
-#   ./vault-provision.sh --customer sanofi --project cronus --environment dev --service video-calling --dry-run
+#   ./vault-provision.sh --customer customer --project project --environment dev --service application
+#   ./vault-provision.sh --customer customer --project project --environment dev --service application --dry-run
 # ==============================================================================
 
 set -euo pipefail
@@ -73,10 +73,10 @@ Usage: ${SCRIPT_NAME} [OPTIONS]
 Provisions complete Vault setup for a service (policies, roles, auth backend).
 
 Required Options:
-  --customer CUSTOMER         Customer name (e.g., sanofi, indegene)
-  --project PROJECT           Project name (e.g., cronus, platform)
+  --customer CUSTOMER         Customer name (e.g., customer, indegene)
+  --project PROJECT           Project name (e.g., project, platform)
   --environment ENV           Environment (e.g., dev, staging, prod)
-  --service SERVICE           Service name (e.g., video-calling-agent)
+  --service SERVICE           Service name (e.g., application-agent)
 
 Optional Flags:
   --configure-auth-backend    Configure Kubernetes auth backend (requires root token)
@@ -92,16 +92,16 @@ Environment Variables:
 
 Examples:
   # Provision complete setup
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application
 
   # Provision with auth backend configuration (first-time setup)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --configure-auth-backend
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --configure-auth-backend
 
   # Preview changes without executing
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --dry-run
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --dry-run
 
   # Only create policy (skip role)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --skip-role
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --skip-role
 
 EOF
 }

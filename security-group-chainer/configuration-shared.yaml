@@ -20,8 +20,8 @@ version: "1.0"
 region: "us-east-2"  # US East (Ohio)
 
 # Customer and Project identifiers (for tagging/reporting)
-customer_name: "Sanofi"
-project_name: "Cronus"
+customer_name: "customer"
+project_name: "project"
 
 # Deployment environment (for tagging/reporting)
 environment: "Shared"  # Options: development, staging, production, shared

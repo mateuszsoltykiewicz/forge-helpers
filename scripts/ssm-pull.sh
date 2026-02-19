@@ -9,7 +9,7 @@
 #                 --service <name> [--output <file>]
 #
 # Example:
-#   ./ssm-pull.sh --customer sanofi --project cronus --environment dev \
+#   ./ssm-pull.sh --customer customer --project project --environment dev \
 #                 --service test-1 --output /tmp/pulled-config.yaml
 # ==============================================================================
 
@@ -59,8 +59,8 @@ Usage:
                    --service <name> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
   --service <name>         Service name (e.g., test-1)
 
@@ -74,11 +74,11 @@ Default Output Path:
 
 Examples:
   # Pull to default location
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1
 
   # Pull to custom location
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --output ./my-config.yaml
 
 EOF

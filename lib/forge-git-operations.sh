@@ -1491,7 +1491,7 @@ setup_git_ssh_authentication() {
 #   git_clone_with_ssh "git@github.com:org/repo.git" "/workspace" "main" "local"
 #   
 #   # SSM mode (force SSM provisioning)
-#   git_clone_with_ssh "git@github.com:org/repo.git" "/workspace" "main" "ssm" "sanofi" "cronus" "dev" "video-calling-agent"
+#   git_clone_with_ssh "git@github.com:org/repo.git" "/workspace" "main" "ssm" "customer" "project" "dev" "application-agent"
 git_clone_with_ssh() {
 	local repo_url="$1"
 	local dest_dir="$2"

@@ -12,8 +12,8 @@
 # - Vault secrets (optional)
 #
 # Usage:
-#   ./vault-clean.sh --customer sanofi --project cronus --environment dev --service video-calling
-#   ./vault-clean.sh --customer sanofi --project cronus --environment dev --service video-calling --delete-secrets
+#   ./vault-clean.sh --customer customer --project project --environment dev --service application
+#   ./vault-clean.sh --customer customer --project project --environment dev --service application --delete-secrets
 # ==============================================================================
 
 set -euo pipefail
@@ -71,10 +71,10 @@ Usage: ${SCRIPT_NAME} [OPTIONS]
 Cleans up Vault resources for a service (roles, policies, secrets).
 
 Required Options:
-  --customer CUSTOMER         Customer name (e.g., sanofi, indegene)
-  --project PROJECT           Project name (e.g., cronus, platform)
+  --customer CUSTOMER         Customer name (e.g., customer, indegene)
+  --project PROJECT           Project name (e.g., project, platform)
   --environment ENV           Environment (e.g., dev, staging, prod)
-  --service SERVICE           Service name (e.g., video-calling-agent)
+  --service SERVICE           Service name (e.g., application-agent)
 
 Optional Flags:
   --delete-secrets            Also delete all secrets for this service
@@ -89,16 +89,16 @@ Environment Variables:
 
 Examples:
   # Clean up policies and roles only
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application
 
   # Clean up everything including secrets
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --delete-secrets
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --delete-secrets
 
   # Preview what would be deleted
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --delete-secrets --dry-run
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --delete-secrets --dry-run
 
   # Force deletion without confirmation
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --delete-secrets --force
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --delete-secrets --force
 
 EOF
 }

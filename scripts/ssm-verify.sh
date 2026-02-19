@@ -9,8 +9,8 @@
 #                   --service <name> --file <yaml-file> [--verbose]
 #
 # Example:
-#   ./ssm-verify.sh --customer sanofi --project cronus --environment dev \
-#                   --service test-1 --file /tmp/sanofi-cronus-dev-test-1.yaml
+#   ./ssm-verify.sh --customer customer --project project --environment dev \
+#                   --service test-1 --file /tmp/customer-project-dev-test-1.yaml
 # ==============================================================================
 
 set -euo pipefail
@@ -67,8 +67,8 @@ Usage:
                    --service <name> --file <yaml-file> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
   --service <name>         Service name (e.g., test-1)
   --file <yaml-file>       Reference YAML file to verify against
@@ -80,11 +80,11 @@ Optional Arguments:
 
 Examples:
   # Verify SSM parameters
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service test-1 --file /tmp/sanofi-cronus-dev-test-1.yaml
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service test-1 --file /tmp/customer-project-dev-test-1.yaml
 
   # Verbose mode (show all comparisons)
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
+  $(basename "$0") --customer customer --project project --environment dev \\
                    --service test-1 --file config.yaml --verbose
 
 Exit Codes:

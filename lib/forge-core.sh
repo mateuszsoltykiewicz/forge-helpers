@@ -426,7 +426,7 @@ to_uppercase() {
 #   PascalCase string to stdout
 #
 # Example:
-#   to_pascal_case "video-calling-agent"  # VideoCallingAgent
+#   to_pascal_case "application-agent"  # VideoCallingAgent
 #   to_pascal_case "video calling agent"  # VideoCallingAgent
 #   to_pascal_case "video_calling_agent"  # VideoCallingAgent
 #
@@ -444,7 +444,7 @@ to_pascal_case() {
 #   snake_case string to stdout
 #
 # Example:
-#   to_snake_case "video-calling-agent"  # video_calling_agent
+#   to_snake_case "application-agent"  # video_calling_agent
 #
 to_snake_case() {
   echo "$1" | tr '-' '_'
@@ -922,7 +922,7 @@ sanitize_database_identifier() {
 #   1 - Invalid queue name
 #
 # Example:
-#   is_valid_queue_name "sanofi-cronus-prod-events.fifo" "true"
+#   is_valid_queue_name "customer-project-prod-events.fifo" "true"
 #
 is_valid_queue_name() {
   local queue_name="$1"

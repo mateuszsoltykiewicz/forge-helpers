@@ -385,7 +385,7 @@ validate_customer_name() {
 #   1 - Invalid project name
 #
 # Example:
-#   validate_project_name "cronus"  # Returns 0
+#   validate_project_name "project"  # Returns 0
 validate_project_name() {
   local name="$1"
   

@@ -13,7 +13,7 @@
 # - Reports missing, extra, or mismatched secrets
 #
 # Usage:
-#   ./vault-verify.sh --customer sanofi --project cronus --environment dev --service test-1 --file vault.yaml
+#   ./vault-verify.sh --customer customer --project project --environment dev --service test-1 --file vault.yaml
 # ==============================================================================
 
 set -euo pipefail
@@ -78,10 +78,10 @@ Usage: ${SCRIPT_NAME} [OPTIONS]
 Verifies secrets in Vault against reference YAML file.
 
 Required Options:
-  --customer CUSTOMER         Customer name (e.g., sanofi, indegene)
-  --project PROJECT           Project name (e.g., cronus, platform)
+  --customer CUSTOMER         Customer name (e.g., customer, indegene)
+  --project PROJECT           Project name (e.g., project, platform)
   --environment ENV           Environment (e.g., dev, staging, prod)
-  --service SERVICE           Service name (e.g., video-calling-agent)
+  --service SERVICE           Service name (e.g., application-agent)
   --file FILE                 Path to reference YAML file
 
 Optional Flags:
@@ -112,10 +112,10 @@ Exit Codes:
 
 Examples:
   # Verify all secrets
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service test-1 --file vault.yaml
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service test-1 --file vault.yaml
 
   # Verbose mode (show all comparisons)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service test-1 --file vault.yaml --verbose
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service test-1 --file vault.yaml --verbose
 
 EOF
 }

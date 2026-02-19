@@ -24,7 +24,7 @@
 #   source /path/to/forge-k8s-operations.sh
 #   setup_port_forward_generic "vault" "vault" 8200 8200
 #   create_configmap "my-config" "default" "key1=value1" "key2=value2"
-#   apply_forge_labels_to_resource "deployment" "my-app" "default" "sanofi" "cronus" "dev" "app"
+#   apply_forge_labels_to_resource "deployment" "my-app" "default" "customer" "project" "dev" "app"
 # ==============================================================================
 
 set -euo pipefail
@@ -303,8 +303,8 @@ check_port_forward_running() {
 #     "app.name=myapp"
 #
 #   # Using forge-patterns:
-#   cm_name=$(get_configmap_name "sanofi" "cronus" "dev" "video-calling" "app")
-#   namespace=$(get_namespace_name "sanofi" "cronus" "dev" "video-calling")
+#   cm_name=$(get_configmap_name "customer" "project" "dev" "application" "app")
+#   namespace=$(get_namespace_name "customer" "project" "dev" "application")
 #   create_configmap "$cm_name" "$namespace" "KEY=value"
 #
 create_configmap() {
@@ -510,12 +510,12 @@ get_configmap_data() {
 # Example:
 #   apply_forge_labels_to_resource \
 #     "deployment" \
-#     "video-calling-agent" \
-#     "sanofi-cronus-dev-video-calling-agent" \
-#     "sanofi" \
-#     "cronus" \
+#     "application-agent" \
+#     "customer-project-dev-application-agent" \
+#     "customer" \
+#     "project" \
 #     "dev" \
-#     "video-calling-agent"
+#     "application-agent"
 #
 apply_forge_labels_to_resource() {
   local resource_type="$1"

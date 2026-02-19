@@ -10,8 +10,8 @@
 #                   [--force] [--dry-run]
 #
 # Example:
-#   ./kms-remove.sh --customer sanofi --project cronus --environment dev \
-#                   --service video-calling --purpose encryption --pending-days 7
+#   ./kms-remove.sh --customer customer --project project --environment dev \
+#                   --service application --purpose encryption --pending-days 7
 # ==============================================================================
 
 set -euo pipefail
@@ -63,10 +63,10 @@ Usage:
                    --service <name> --purpose <purpose> [OPTIONS]
 
 Required Arguments:
-  --customer <name>        Customer name (e.g., sanofi)
-  --project <name>         Project name (e.g., cronus)
+  --customer <name>        Customer name (e.g., customer)
+  --project <name>         Project name (e.g., project)
   --environment <env>      Environment (dev, staging, prod)
-  --service <name>         Service name (e.g., video-calling)
+  --service <name>         Service name (e.g., application)
   --purpose <purpose>      Key purpose (e.g., encryption, signing, data, secrets)
 
 Optional Arguments:
@@ -81,16 +81,16 @@ Key Naming Convention:
 
 Examples:
   # Schedule deletion with 7-day waiting period
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service video-calling --purpose encryption --pending-days 7
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service application --purpose encryption --pending-days 7
 
   # Force deletion without confirmation
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service video-calling --purpose data --force
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service application --purpose data --force
 
   # Dry-run mode
-  $(basename "$0") --customer sanofi --project cronus --environment dev \\
-                   --service video-calling --purpose encryption --dry-run
+  $(basename "$0") --customer customer --project project --environment dev \\
+                   --service application --purpose encryption --dry-run
 
 ⚠️  WARNING: KMS key deletion is DESTRUCTIVE!
    - Keys are scheduled for deletion (7-30 day waiting period)

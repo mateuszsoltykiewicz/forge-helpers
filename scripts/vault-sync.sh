@@ -13,8 +13,8 @@
 # - Supports change detection (only updates when needed)
 #
 # Usage:
-#   ./vault-sync.sh --customer sanofi --project cronus --environment dev --service video-calling
-#   ./vault-sync.sh --customer sanofi --project cronus --environment dev --service video-calling --detect-orphans
+#   ./vault-sync.sh --customer customer --project project --environment dev --service application
+#   ./vault-sync.sh --customer customer --project project --environment dev --service application --detect-orphans
 # ==============================================================================
 
 set -euo pipefail
@@ -73,10 +73,10 @@ Usage: ${SCRIPT_NAME} [OPTIONS]
 Syncs secrets from AWS SSM Parameter Store to Vault.
 
 Required Options:
-  --customer CUSTOMER         Customer name (e.g., sanofi, indegene)
-  --project PROJECT           Project name (e.g., cronus, platform)
+  --customer CUSTOMER         Customer name (e.g., customer, indegene)
+  --project PROJECT           Project name (e.g., project, platform)
   --environment ENV           Environment (e.g., dev, staging, prod)
-  --service SERVICE           Service name (e.g., video-calling-agent)
+  --service SERVICE           Service name (e.g., application-agent)
 
 Optional Flags:
   --sections SECTIONS         Comma-separated list of sections to sync (default: all)
@@ -94,27 +94,27 @@ Environment Variables:
 
 Examples:
   # Sync all sections from SSM to Vault
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application
 
   # Import from YAML file
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service test-1 --from-yaml vault.yaml
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service test-1 --from-yaml vault.yaml
 
   # Sync only specific sections
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --sections app,livekit
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --sections app,livekit
 
   # Detect orphaned secrets (in Vault but not in SSM)
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --detect-orphans
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --detect-orphans
 
   # Preview sync without making changes
-  ${SCRIPT_NAME} --customer sanofi --project cronus --environment dev --service video-calling --dry-run
+  ${SCRIPT_NAME} --customer customer --project project --environment dev --service application --dry-run
 
 SSM Parameter Path Format:
   /{customer}/{project}/{environment}/{service}/{section}/{key}
-  Example: /sanofi/cronus/dev/video-calling/app/PORT
+  Example: /customer/project/dev/application/app/PORT
 
 Vault Secret Path Format:
   secret/{customer}/{project}/{environment}/{service}/{section}
-  Example: secret/sanofi/cronus/dev/video-calling/app
+  Example: secret/customer/project/dev/application/app
 
 EOF
 }

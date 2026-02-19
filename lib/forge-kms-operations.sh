@@ -19,12 +19,12 @@
 #   alias/{customer}/{project}/{environment}/{service}/{purpose}
 #
 # Example:
-#   alias/sanofi/cronus/dev/video-calling/encryption
+#   alias/customer/project/dev/application/encryption
 #
 # Usage:
 #   source /path/to/forge-kms-operations.sh
-#   create_kms_key "sanofi" "cronus" "dev" "test-service" "encryption" "false"
-#   delete_kms_key "sanofi" "cronus" "dev" "test-service" "encryption" "7" "false"
+#   create_kms_key "customer" "project" "dev" "test-service" "encryption" "false"
+#   delete_kms_key "customer" "project" "dev" "test-service" "encryption" "7" "false"
 # ==============================================================================
 
 set -euo pipefail
@@ -96,7 +96,7 @@ validate_required_commands aws jq
 #   0 on success, 1 on failure
 #
 # Example:
-#   key_id=$(create_kms_key "sanofi" "cronus" "dev" "video-calling" "encryption" "false")
+#   key_id=$(create_kms_key "customer" "project" "dev" "application" "encryption" "false")
 #
 create_kms_key() {
   local customer="$1"
@@ -231,7 +231,7 @@ create_kms_key() {
 #   0 on success, 1 on failure
 #
 # Example:
-#   delete_kms_key "sanofi" "cronus" "dev" "video-calling" "encryption" "7" "false"
+#   delete_kms_key "customer" "project" "dev" "application" "encryption" "7" "false"
 #
 delete_kms_key() {
   local customer="$1"
@@ -334,7 +334,7 @@ delete_kms_key() {
 #   0 if exists, 1 if not
 #
 # Example:
-#   if key_exists "sanofi" "cronus" "dev" "video-calling" "encryption"; then
+#   if key_exists "customer" "project" "dev" "application" "encryption"; then
 #     echo "Key exists"
 #   fi
 #
@@ -356,7 +356,7 @@ key_exists() {
 # Retrieves KMS key ID for a given alias
 #
 # Arguments:
-#   $1 - Alias name (e.g., alias/sanofi/cronus/dev/video-calling/encryption)
+#   $1 - Alias name (e.g., alias/customer/project/dev/application/encryption)
 #
 # Output:
 #   Key ID to stdout
@@ -365,7 +365,7 @@ key_exists() {
 #   0 on success, 1 on failure
 #
 # Example:
-#   key_id=$(get_key_id_by_alias "alias/sanofi/cronus/dev/video-calling/encryption")
+#   key_id=$(get_key_id_by_alias "alias/customer/project/dev/application/encryption")
 #
 get_key_id_by_alias() {
   local alias_name="$1"
@@ -387,7 +387,7 @@ get_key_id_by_alias() {
 #   JSON array of key information
 #
 # Example:
-#   list_kms_keys "sanofi" "cronus" "dev" "video-calling"
+#   list_kms_keys "customer" "project" "dev" "application"
 #
 list_kms_keys() {
   local customer="$1"
@@ -413,7 +413,7 @@ list_kms_keys() {
 #   JSON object with key metadata
 #
 # Example:
-#   get_key_info "sanofi" "cronus" "dev" "video-calling" "encryption"
+#   get_key_info "customer" "project" "dev" "application" "encryption"
 #
 get_key_info() {
   local customer="$1"

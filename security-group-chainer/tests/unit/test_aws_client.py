@@ -350,8 +350,8 @@ class TestVPCDiscovery:
                 {
                     'VpcId': 'vpc-12345678',
                     'Tags': [
-                        {'Key': 'Customer', 'Value': 'Sanofi'},
-                        {'Key': 'Project', 'Value': 'Cronus'},
+                        {'Key': 'Customer', 'Value': 'customer'},
+                        {'Key': 'Project', 'Value': 'project'},
                         {'Key': 'Region', 'Value': 'us-east-2'},
                         {'Key': 'Environment', 'Value': 'shared'}
                     ]
@@ -362,8 +362,8 @@ class TestVPCDiscovery:
         client = AWSSecurityGroupClient(region='us-east-2')
         
         vpc_id = client.discover_vpc_by_tags(
-            customer='Sanofi',
-            project='Cronus',
+            customer='customer',
+            project='project',
             region='us-east-2',
             environment='shared'
         )
@@ -373,8 +373,8 @@ class TestVPCDiscovery:
         # Verify correct filters were used
         mock_ec2.describe_vpcs.assert_called_once_with(
             Filters=[
-                {'Name': 'tag:Customer', 'Values': ['Sanofi']},
-                {'Name': 'tag:Project', 'Values': ['Cronus']},
+                {'Name': 'tag:Customer', 'Values': ['customer']},
+                {'Name': 'tag:Project', 'Values': ['project']},
                 {'Name': 'tag:Region', 'Values': ['us-east-2']},
                 {'Name': 'tag:Environment', 'Values': ['shared']}
             ]
@@ -410,8 +410,8 @@ class TestVPCDiscovery:
                 {
                     'VpcId': 'vpc-primary',
                     'Tags': [
-                        {'Key': 'Customer', 'Value': 'Sanofi'},
-                        {'Key': 'Project', 'Value': 'Cronus'},
+                        {'Key': 'Customer', 'Value': 'customer'},
+                        {'Key': 'Project', 'Value': 'project'},
                         {'Key': 'Region', 'Value': 'us-east-2'},
                         {'Key': 'Environment', 'Value': 'shared'},
                         {'Key': 'CurrentDeployment', 'Value': 'Primary'}
@@ -420,8 +420,8 @@ class TestVPCDiscovery:
                 {
                     'VpcId': 'vpc-secondary',
                     'Tags': [
-                        {'Key': 'Customer', 'Value': 'Sanofi'},
-                        {'Key': 'Project', 'Value': 'Cronus'},
+                        {'Key': 'Customer', 'Value': 'customer'},
+                        {'Key': 'Project', 'Value': 'project'},
                         {'Key': 'Region', 'Value': 'us-east-2'},
                         {'Key': 'Environment', 'Value': 'shared'},
                         {'Key': 'CurrentDeployment', 'Value': 'Secondary'}
@@ -433,8 +433,8 @@ class TestVPCDiscovery:
         client = AWSSecurityGroupClient(region='us-east-2')
         
         vpc_id = client.discover_vpc_by_tags(
-            customer='Sanofi',
-            project='Cronus',
+            customer='customer',
+            project='project',
             region='us-east-2',
             environment='shared',
             current_deployment='Primary'
@@ -459,8 +459,8 @@ class TestVPCDiscovery:
         
         with pytest.raises(ValueError) as exc_info:
             client.discover_vpc_by_tags(
-                customer='Sanofi',
-                project='Cronus',
+                customer='customer',
+                project='project',
                 region='us-east-2',
                 environment='shared'
             )
@@ -488,8 +488,8 @@ class TestVPCDiscovery:
         client = AWSSecurityGroupClient(region='us-east-2')
         
         vpc_id = client.discover_vpc_by_tags(
-            customer='Sanofi',
-            project='Cronus',
+            customer='customer',
+            project='project',
             region='us-east-2',
             environment='shared'
         )

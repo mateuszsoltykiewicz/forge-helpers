@@ -7,8 +7,8 @@
 ```bash
 # 90% of use cases: Just change max pods limit
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment dev \
   --service my-app \
   --max-pods 150  # ⭐ MOST IMPORTANT ARG - always supported
@@ -79,8 +79,8 @@
 ```bash
 # Developer creates namespace for new microservice
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment dev \
   --service payment-api
 
@@ -93,8 +93,8 @@
 ```bash
 # Later: Need to run integration tests with multiple replicas
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment dev \
   --service payment-api \
   --max-pods 20  # Easy override when needed
@@ -108,8 +108,8 @@
 ```bash
 # Production: Known requirements
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment prod \
   --service payment-api \
   --max-pods 50 \
@@ -228,7 +228,7 @@
 ```bash
 ./scripts/namespace-create.sh \
   --type privileged \
-  --customer sanofi \
+  --customer customer \
   --project infrastructure \
   --environment prod \
   --service node-monitoring \
@@ -240,8 +240,8 @@
 ```bash
 # Pattern 1: Override just max pods (90% of use cases)
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment dev \
   --service my-app \
   --max-pods 100  # Quick pod limit override
@@ -249,7 +249,7 @@
 # Pattern 2: Privileged namespace with custom pod limit
 ./scripts/namespace-create.sh \
   --type privileged \
-  --customer sanofi \
+  --customer customer \
   --project infrastructure \
   --environment prod \
   --service monitoring \
@@ -257,8 +257,8 @@
 
 # Pattern 3: Full quota override via CLI (no config file needed)
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment prod \
   --service critical \
   --max-pods 200 \
@@ -268,8 +268,8 @@
 
 # Pattern 4: Config file + max-pods override
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment staging \
   --service test \
   --config-path ./configs/base.yaml \
@@ -362,8 +362,8 @@ Pods: 3                       # ⭐ DEFAULT: Start small, use --max-pods to incr
 ```bash
 # Most applications need more than 3 pods
 ./scripts/namespace-create.sh \
-  --customer sanofi \
-  --project cronus \
+  --customer customer \
+  --project project \
   --environment dev \
   --service my-app \
   --max-pods 50 \      # Scale to 50 pods
