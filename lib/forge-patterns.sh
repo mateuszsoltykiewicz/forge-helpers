@@ -1379,6 +1379,250 @@ export -f get_vault_policy_name get_vault_role_name
 # Path builders
 export -f get_config_path get_helm_values_path
 
+# ==============================================================================
+# HELM NAMING PATTERNS
+# ==============================================================================
+
+# get_helm_release_name
+# Builds Helm release name following Forge convention
+# Pattern: {customer}-{project}-{environment}-{service}
+#
+# Arguments:
+#   $1 - Customer name (e.g., acme, techcorp)
+#   $2 - Project name (e.g., platform, backend)
+#   $3 - Environment (e.g., dev, staging, prod)
+#   $4 - Service name (e.g., api-gateway)
+#
+# Output:
+#   Helm release name to stdout
+#
+# Example:
+#   get_helm_release_name "customer" "project" "dev" "api-gateway"
+#   # Output: customer-project-dev-api-gateway
+#
+get_helm_release_name() {
+  local customer="$1"
+  local project="$2"
+  local environment="$3"
+  local service="$4"
+  
+  echo "${customer}-${project}-${environment}-${service}"
+}
+
+# get_helm_chart_repository_url
+# Builds Helm chart repository URL following Forge convention
+# Pattern (OCI): oci://{registry}.{customer}-{project}.io/charts
+# Pattern (HTTPS): https://charts.{customer}-{project}.io
+#
+# Arguments:
+#   $1 - Customer name
+#   $2 - Project name
+#   $3 - Registry type (oci|https, default: oci)
+#
+# Output:
+#   Chart repository URL to stdout
+#
+# Example:
+#   get_helm_chart_repository_url "customer" "project" "oci"
+#   # Output: oci://registry.customer-project.io/charts
+#
+#   get_helm_chart_repository_url "customer" "project" "https"
+#   # Output: https://charts.customer-project.io
+#
+get_helm_chart_repository_url() {
+  local customer="$1"
+  local project="$2"
+  local registry_type="${3:-oci}"
+  
+  case "$registry_type" in
+    oci)
+      echo "oci://registry.${customer}-${project}.io/charts"
+      ;;
+    https)
+      echo "https://charts.${customer}-${project}.io"
+      ;;
+    *)
+      echo "ERROR: Invalid registry type: $registry_type (expected: oci or https)" >&2
+      return 1
+      ;;
+  esac
+}
+
+# get_helm_values_files
+# Returns array of Helm values files in precedence order
+# Order: base → environment → service-specific → custom
+# Pattern: deployment/helm/{chart-name}/values[-{environment}].yaml
+#
+# Arguments:
+#   $1 - Chart name (e.g., my-service-chart)
+#   $2 - Environment (e.g., dev, staging, prod)
+#   $3 - Custom values file path (optional)
+#
+# Output:
+#   Space-separated list of existing values files to stdout
+#
+# Example:
+#   get_helm_values_files "my-service" "dev" "/path/to/custom.yaml"
+#   # Output: deployment/helm/my-service/values.yaml deployment/helm/my-service/values-dev.yaml /path/to/custom.yaml
+#
+get_helm_values_files() {
+  local chart_name="$1"
+  local environment="$2"
+  local custom_values="${3:-}"
+  
+  local base_path="deployment/helm/${chart_name}"
+  local files=()
+  
+  # Base values (always first if exists)
+  if [[ -f "${base_path}/values.yaml" ]]; then
+    files+=("${base_path}/values.yaml")
+  fi
+  
+  # Environment-specific values
+  if [[ -f "${base_path}/values-${environment}.yaml" ]]; then
+    files+=("${base_path}/values-${environment}.yaml")
+  fi
+  
+  # Custom values file (highest precedence)
+  if [[ -n "$custom_values" ]] && [[ -f "$custom_values" ]]; then
+    files+=("$custom_values")
+  fi
+  
+  # Output space-separated
+  echo "${files[*]}"
+}
+
+# get_helm_release_labels
+# Generates standard Kubernetes labels for Helm releases
+# Follows both Helm and Forge conventions
+#
+# Arguments:
+#   $1 - Customer name
+#   $2 - Project name
+#   $3 - Environment
+#   $4 - Service name
+#   $5 - Chart name (optional, defaults to service name)
+#   $6 - Chart version (optional)
+#
+# Output:
+#   YAML-formatted labels to stdout
+#
+# Example:
+#   get_helm_release_labels "customer" "project" "dev" "api-gateway" "api-chart" "1.0.0"
+#   # Output:
+#   # app.kubernetes.io/name: api-gateway
+#   # app.kubernetes.io/instance: customer-project-dev-api-gateway
+#   # app.kubernetes.io/version: "1.0.0"
+#   # app.kubernetes.io/component: api-gateway
+#   # app.kubernetes.io/part-of: customer-project
+#   # app.kubernetes.io/managed-by: Helm
+#   # moai.io/customer: customer
+#   # moai.io/project: project
+#   # moai.io/environment: dev
+#   # moai.io/service: api-gateway
+#
+get_helm_release_labels() {
+  local customer="$1"
+  local project="$2"
+  local environment="$3"
+  local service="$4"
+  local chart_name="${5:-$service}"
+  local chart_version="${6:-}"
+  
+  local release_name="${customer}-${project}-${environment}-${service}"
+  
+  cat <<EOF
+app.kubernetes.io/name: ${service}
+app.kubernetes.io/instance: ${release_name}
+app.kubernetes.io/component: ${service}
+app.kubernetes.io/part-of: ${customer}-${project}
+app.kubernetes.io/managed-by: Helm
+moai.io/customer: ${customer}
+moai.io/project: ${project}
+moai.io/environment: ${environment}
+moai.io/service: ${service}
+EOF
+
+  # Optional version label
+  if [[ -n "$chart_version" ]]; then
+    echo "app.kubernetes.io/version: \"${chart_version}\""
+  fi
+}
+
+# get_helm_backup_path
+# Builds path for Helm release manifest backups
+# Pattern: deployment/backups/helm/{release-name}/{timestamp}
+#
+# Arguments:
+#   $1 - Release name (e.g., customer-project-dev-api)
+#   $2 - Timestamp (optional, defaults to current timestamp)
+#
+# Output:
+#   Backup directory path to stdout
+#
+# Example:
+#   get_helm_backup_path "customer-project-dev-api" "20260219-143000"
+#   # Output: deployment/backups/helm/customer-project-dev-api/20260219-143000
+#
+get_helm_backup_path() {
+  local release_name="$1"
+  local timestamp="${2:-$(date +%Y%m%d-%H%M%S)}"
+  
+  echo "deployment/backups/helm/${release_name}/${timestamp}"
+}
+
+# validate_helm_release_name
+# Validates Helm release name follows Forge convention
+# Checks format: {customer}-{project}-{environment}-{service}
+# All parts must be lowercase alphanumeric with hyphens
+#
+# Arguments:
+#   $1 - Release name to validate
+#
+# Returns:
+#   0 - Valid release name
+#   1 - Invalid release name
+#
+# Example:
+#   validate_helm_release_name "customer-project-dev-api-gateway" && echo "Valid"
+#
+validate_helm_release_name() {
+  local release_name="$1"
+  
+  # Check if empty
+  if [[ -z "$release_name" ]]; then
+    echo "ERROR: Release name cannot be empty" >&2
+    return 1
+  fi
+  
+  # Check length (Helm has 53 character limit for release names)
+  if [[ ${#release_name} -gt 53 ]]; then
+    echo "ERROR: Release name exceeds 53 characters (Helm limit): ${release_name}" >&2
+    return 1
+  fi
+  
+  # Check format: lowercase alphanumeric and hyphens only
+  if [[ ! "$release_name" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+    echo "ERROR: Invalid release name format: ${release_name}" >&2
+    echo "  Must be lowercase alphanumeric with hyphens, starting and ending with alphanumeric" >&2
+    return 1
+  fi
+  
+  # Check for Forge pattern (4 parts separated by hyphens)
+  local part_count
+  part_count=$(echo "$release_name" | awk -F'-' '{print NF}')
+  
+  if [[ $part_count -lt 4 ]]; then
+    echo "WARNING: Release name does not follow Forge pattern (customer-project-environment-service): ${release_name}" >&2
+  fi
+  
+  return 0
+}
+
+# Helm patterns
+export -f get_helm_release_name get_helm_chart_repository_url get_helm_values_files
+export -f get_helm_release_labels get_helm_backup_path validate_helm_release_name
+
 # Validation
 export -f validate_forge_pattern_args
 

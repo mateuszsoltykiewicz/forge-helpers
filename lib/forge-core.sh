@@ -1143,6 +1143,453 @@ export -f get_timestamp get_iso_timestamp calculate_duration
 export -f print_banner
 
 # ==============================================================================
+# HELM UTILITIES
+# ==============================================================================
+
+# validate_helm_installed
+# Validates that Helm is installed and meets minimum version requirement
+#
+# Arguments:
+#   $1 - min_version: Minimum required Helm version (default: 3.0.0)
+#
+# Returns:
+#   0 - Helm installed and version meets requirement
+#   1 - Helm not installed or version too old
+#
+# Example:
+#   validate_helm_installed "3.8.0" || exit 1
+#
+validate_helm_installed() {
+  local min_version="${1:-3.0.0}"
+  
+  # Check if helm command exists
+  if ! command -v helm &> /dev/null; then
+    log_error "Helm is not installed"
+    log_error "Install from: https://helm.sh/docs/intro/install/"
+    return 1
+  fi
+  
+  # Get current version
+  local current_version
+  current_version=$(helm version --short 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+  
+  if [[ -z "$current_version" ]]; then
+    log_error "Could not determine Helm version"
+    return 1
+  fi
+  
+  # Compare versions
+  if version_compare "$current_version" "$min_version"; then
+    log_debug "Helm version ${current_version} meets minimum requirement ${min_version}"
+    return 0
+  else
+    log_error "Helm version ${current_version} is below minimum ${min_version}"
+    return 1
+  fi
+}
+
+# validate_helm_plugin
+# Validates that a Helm plugin is installed
+#
+# Arguments:
+#   $1 - plugin_name: Name of the plugin (e.g., diff, secrets)
+#
+# Returns:
+#   0 - Plugin is installed
+#   1 - Plugin not installed
+#
+# Example:
+#   validate_helm_plugin "diff" || log_warn "helm-diff plugin not available"
+#
+validate_helm_plugin() {
+  local plugin_name="$1"
+  
+  if ! command -v helm &> /dev/null; then
+    log_error "Helm is not installed"
+    return 1
+  fi
+  
+  if helm plugin list 2>/dev/null | grep -q "^${plugin_name}"; then
+    log_debug "Helm plugin '${plugin_name}' is installed"
+    return 0
+  else
+    log_debug "Helm plugin '${plugin_name}' is not installed"
+    return 1
+  fi
+}
+
+# wait_for_helm_release
+# Waits for a Helm release to reach a specific status
+#
+# Arguments:
+#   $1 - release_name: Name of the release
+#   $2 - namespace: Kubernetes namespace
+#   $3 - desired_status: Expected status (default: deployed)
+#   $4 - timeout: Timeout in seconds (default: 300)
+#
+# Returns:
+#   0 - Release reached desired status
+#   1 - Timeout or release failed
+#
+# Example:
+#   wait_for_helm_release "my-app" "default" "deployed" 600
+#
+wait_for_helm_release() {
+  local release_name="$1"
+  local namespace="$2"
+  local desired_status="${3:-deployed}"
+  local timeout="${4:-300}"
+  
+  log_info "Waiting for release '${release_name}' to reach status '${desired_status}'..."
+  
+  local elapsed=0
+  local interval=5
+  
+  while [[ $elapsed -lt $timeout ]]; do
+    local current_status
+    current_status=$(helm status "$release_name" -n "$namespace" -o json 2>/dev/null | jq -r '.info.status' 2>/dev/null || echo "unknown")
+    
+    if [[ "$current_status" == "$desired_status" ]]; then
+      log_success "Release '${release_name}' reached status: ${desired_status}"
+      return 0
+    fi
+    
+    if [[ "$current_status" == "failed" ]]; then
+      log_error "Release '${release_name}' entered failed state"
+      return 1
+    fi
+    
+    log_debug "Current status: ${current_status}, waiting... (${elapsed}s/${timeout}s)"
+    sleep $interval
+    elapsed=$((elapsed + interval))
+  done
+  
+  log_error "Timeout waiting for release '${release_name}' to reach status '${desired_status}'"
+  return 1
+}
+
+# merge_yaml_files
+# Merges multiple YAML files using yq (deep merge strategy)
+#
+# Arguments:
+#   $1 - output_file: Path to output merged YAML
+#   $@ - input_files: List of input YAML files to merge
+#
+# Returns:
+#   0 - Success
+#   1 - Error (yq not installed or merge failed)
+#
+# Example:
+#   merge_yaml_files merged.yaml base.yaml overrides.yaml custom.yaml
+#
+merge_yaml_files() {
+  if [[ $# -lt 2 ]]; then
+    log_error "Usage: merge_yaml_files <output_file> <input_file1> [input_file2 ...]"
+    return 1
+  fi
+  
+  local output_file="$1"
+  shift
+  local input_files=("$@")
+  
+  # Validate yq is installed
+  if ! command -v yq &> /dev/null; then
+    log_error "yq is not installed (required for YAML merging)"
+    log_error "Install from: https://github.com/mikefarah/yq"
+    return 1
+  fi
+  
+  # Validate input files exist
+  for file in "${input_files[@]}"; do
+    if [[ ! -f "$file" ]]; then
+      log_error "Input file not found: ${file}"
+      return 1
+    fi
+  done
+  
+  log_debug "Merging ${#input_files[@]} YAML files into: ${output_file}"
+  
+  # Build yq merge expression
+  local merge_expr=""
+  for i in "${!input_files[@]}"; do
+    if [[ $i -eq 0 ]]; then
+      merge_expr="."
+    else
+      merge_expr="${merge_expr} * load(\"${input_files[$i]}\")"
+    fi
+  done
+  
+  # Execute merge
+  if yq eval "$merge_expr" "${input_files[0]}" > "$output_file" 2>/dev/null; then
+    log_debug "YAML files merged successfully"
+    return 0
+  else
+    log_error "Failed to merge YAML files"
+    return 1
+  fi
+}
+
+# version_compare
+# Compares two semantic version strings
+#
+# Arguments:
+#   $1 - version1: First version (e.g., 1.2.3)
+#   $2 - version2: Second version to compare against
+#
+# Returns:
+#   0 - version1 >= version2
+#   1 - version1 < version2
+#
+# Example:
+#   version_compare "3.8.0" "3.0.0" && echo "Version OK"
+#
+version_compare() {
+  local version1="$1"
+  local version2="$2"
+  
+  # Handle empty versions
+  if [[ -z "$version1" ]] || [[ -z "$version2" ]]; then
+    return 1
+  fi
+  
+  # Use sort -V to compare versions
+  if [[ "$(printf '%s\n' "$version1" "$version2" | sort -V | head -n1)" == "$version2" ]]; then
+    return 0  # version1 >= version2
+  else
+    return 1  # version1 < version2
+  fi
+}
+
+# check_kubernetes_resource_ready
+# Generic check if Kubernetes resource is ready
+#
+# Arguments:
+#   $1 - resource_type: Type of resource (deployment, statefulset, pod, etc.)
+#   $2 - resource_name: Name of the resource
+#   $3 - namespace: Kubernetes namespace
+#   $4 - timeout: Timeout in seconds (default: 300)
+#
+# Returns:
+#   0 - Resource is ready
+#   1 - Resource not ready or timeout
+#
+# Example:
+#   check_kubernetes_resource_ready "deployment" "my-app" "default" 600
+#
+check_kubernetes_resource_ready() {
+  local resource_type="$1"
+  local resource_name="$2"
+  local namespace="$3"
+  local timeout="${4:-300}"
+  
+  log_info "Checking if ${resource_type}/${resource_name} is ready..."
+  
+  # Validate kubectl is available
+  if ! command -v kubectl &> /dev/null; then
+    log_error "kubectl is not installed"
+    return 1
+  fi
+  
+  # Use kubectl wait with condition=Ready
+  if kubectl wait "${resource_type}/${resource_name}" \
+    -n "$namespace" \
+    --for=condition=Ready \
+    --timeout="${timeout}s" 2>&1 | grep -q "condition met"; then
+    
+    log_success "${resource_type}/${resource_name} is ready"
+    return 0
+  else
+    log_error "${resource_type}/${resource_name} failed to become ready"
+    return 1
+  fi
+}
+
+# log_pipe_output
+# Pipes command output to log functions (preserves formatting)
+# Reads from stdin and logs each line
+#
+# Arguments:
+#   $1 - log_level: Log level (info, debug, error, warn) (default: debug)
+#
+# Usage:
+#   helm install my-app ./chart 2>&1 | log_pipe_output "info"
+#
+log_pipe_output() {
+  local log_level="${1:-debug}"
+  
+  while IFS= read -r line; do
+    case "$log_level" in
+      info)
+        log_info "$line"
+        ;;
+      error)
+        log_error "$line"
+        ;;
+      warn|warning)
+        log_warning "$line"
+        ;;
+      debug|*)
+        log_debug "$line"
+        ;;
+    esac
+  done
+}
+
+# retry_helm_command
+# Retries a Helm command with exponential backoff
+#
+# Arguments:
+#   $1 - max_attempts: Maximum number of retry attempts
+#   $2 - initial_delay: Initial delay in seconds (default: 2)
+#   $@ - command: Helm command and arguments to execute
+#
+# Returns:
+#   0 - Command succeeded
+#   1 - Command failed after all retries
+#
+# Example:
+#   retry_helm_command 3 2 helm repo update
+#
+retry_helm_command() {
+  local max_attempts="$1"
+  local initial_delay="${2:-2}"
+  shift 2
+  local command=("$@")
+  
+  local attempt=1
+  local delay=$initial_delay
+  
+  while [[ $attempt -le $max_attempts ]]; do
+    log_debug "Attempt ${attempt}/${max_attempts}: ${command[*]}"
+    
+    if "${command[@]}"; then
+      log_debug "Command succeeded on attempt ${attempt}"
+      return 0
+    fi
+    
+    if [[ $attempt -lt $max_attempts ]]; then
+      log_warning "Attempt ${attempt} failed, retrying in ${delay}s..."
+      sleep $delay
+      delay=$((delay * 2))  # Exponential backoff
+    fi
+    
+    ((attempt++))
+  done
+  
+  log_error "Command failed after ${max_attempts} attempts: ${command[*]}"
+  return 1
+}
+
+# helm_error_handler
+# Parses Helm error output and provides helpful suggestions
+#
+# Arguments:
+#   $1 - error_output: Error message from Helm command
+#
+# Output:
+#   Formatted error message with suggestions to stdout
+#
+# Example:
+#   helm install app ./chart 2>&1 | helm_error_handler
+#
+helm_error_handler() {
+  local error_output="$1"
+  
+  # Common Helm error patterns and suggestions
+  if echo "$error_output" | grep -q "release.*already exists"; then
+    log_error "Release already exists"
+    log_info "Suggestion: Use 'helm upgrade --install' for idempotent operations"
+    log_info "Or uninstall first: 'helm uninstall <release> -n <namespace>'"
+    
+  elif echo "$error_output" | grep -q "chart.*not found"; then
+    log_error "Chart not found"
+    log_info "Suggestion: Check chart path or repository name"
+    log_info "List repos: 'helm repo list'"
+    log_info "Search charts: 'helm search repo <keyword>'"
+    
+  elif echo "$error_output" | grep -q "no.*repository.*configured"; then
+    log_error "No Helm repositories configured"
+    log_info "Suggestion: Add a repository first"
+    log_info "Example: 'helm repo add bitnami https://charts.bitnami.com/bitnami'"
+    
+  elif echo "$error_output" | grep -q "validation.*failed"; then
+    log_error "Helm chart validation failed"
+    log_info "Suggestion: Run 'helm lint' to check for issues"
+    log_info "Check values.yaml against chart requirements"
+    
+  elif echo "$error_output" | grep -q "timed out waiting"; then
+    log_error "Helm operation timed out"
+    log_info "Suggestion: Increase timeout with --timeout flag"
+    log_info "Check pod status: 'kubectl get pods -n <namespace>'"
+    
+  elif echo "$error_output" | grep -q "cannot re-use a name"; then
+    log_error "Release name already in use"
+    log_info "Suggestion: Choose a different release name or uninstall existing release"
+    
+  else
+    log_error "Helm command failed"
+  fi
+  
+  # Always show the original error
+  log_debug "Original error: ${error_output}"
+}
+
+# generate_helm_diff
+# Generates a diff between current and proposed Helm values
+# Requires helm-diff plugin
+#
+# Arguments:
+#   $1 - release_name: Name of the release
+#   $2 - namespace: Kubernetes namespace
+#   $3 - chart: Chart path or repo/chart
+#   $@ - additional_args: Additional helm upgrade arguments
+#
+# Returns:
+#   0 - Diff generated successfully
+#   1 - Error (plugin not installed or diff failed)
+#
+# Example:
+#   generate_helm_diff "my-app" "default" "./chart" -f values.yaml
+#
+generate_helm_diff() {
+  if [[ $# -lt 3 ]]; then
+    log_error "Usage: generate_helm_diff <release> <namespace> <chart> [additional_args...]"
+    return 1
+  fi
+  
+  local release_name="$1"
+  local namespace="$2"
+  local chart="$3"
+  shift 3
+  local additional_args=("$@")
+  
+  # Check if helm-diff plugin is installed
+  if ! validate_helm_plugin "diff"; then
+    log_warning "helm-diff plugin not installed"
+    log_info "Install with: helm plugin install https://github.com/databus23/helm-diff"
+    return 1
+  fi
+  
+  log_info "Generating diff for release '${release_name}'..."
+  
+  # Run helm diff
+  if helm diff upgrade "$release_name" "$chart" \
+    -n "$namespace" \
+    "${additional_args[@]}" 2>&1; then
+    
+    return 0
+  else
+    log_error "Failed to generate diff"
+    return 1
+  fi
+}
+
+# Helm utilities
+export -f validate_helm_installed validate_helm_plugin wait_for_helm_release
+export -f merge_yaml_files version_compare check_kubernetes_resource_ready
+export -f log_pipe_output retry_helm_command helm_error_handler generate_helm_diff
+
+# ==============================================================================
 # INITIALIZATION
 # ==============================================================================
 
