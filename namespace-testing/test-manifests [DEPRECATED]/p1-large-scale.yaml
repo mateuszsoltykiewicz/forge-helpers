@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-p1-large-scale
+  labels:
+    moai.forge.io/managed: "true"
+    moai.forge.io/type: "application"
+    moai.forge.io/owner: "platform-team"
+    moai.forge.io/project: "forge-testing"
+    moai.forge.io/environment: "test"
+---
+# Large scale deployment with high replica count
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-large
+  namespace: ns-p1-large-scale
+spec:
+  replicas: 50
+  selector:
+    matchLabels:
+      app: deploy-large
+  template:
+    metadata:
+      labels:
+        app: deploy-large
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.21
+          resources:
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+---
+# HPA with very high maxReplicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-xlarge
+  namespace: ns-p1-large-scale
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: deploy-xlarge
+  template:
+    metadata:
+      labels:
+        app: deploy-xlarge
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.21
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-xlarge
+  namespace: ns-p1-large-scale
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: deploy-xlarge
+  minReplicas: 10
+  maxReplicas: 100
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
