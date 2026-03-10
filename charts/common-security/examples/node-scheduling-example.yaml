@@ -1,0 +1,199 @@
+# Example: Trivy Scan Job with Node Scheduling Configuration
+#
+# This example demonstrates how to configure Trivy scan jobs to run only on
+# specific nodes using tolerations, node affinity, and pod anti-affinity.
+#
+# Use Case:
+# - Dedicated security scanning nodes with taints
+# - SSD storage for faster scanning
+# - Distribute scan jobs across nodes to avoid resource contention
+#
+# Prerequisites:
+# 1. Label nodes for security scanning:
+#    kubectl label nodes node-1 node-role.kubernetes.io/security=scanner
+#    kubectl label nodes node-1 nodeType=security-scanner
+#    kubectl label nodes node-1 diskType=ssd
+#
+# 2. Taint nodes to dedicate them for security workloads:
+#    kubectl taint nodes node-1 security-scanning=true:NoSchedule
+#    kubectl taint nodes node-1 node-role.kubernetes.io/batch:NoSchedule
+
+security:
+  trivy:
+    namespace: "trivy-system"
+    
+    scanJob:
+      enabled: true
+      
+      # Run daily at 2 AM
+      schedule: "0 2 * * *"
+      
+      # Image to scan
+      imageRef: "myregistry.io/myapp:latest"
+      
+      # Report CRITICAL and HIGH severities only
+      severity:
+        - CRITICAL
+        - HIGH
+      
+      # Ignore unfixed vulnerabilities
+      ignoreUnfixed: true
+      
+      # Service account with image pull permissions
+      serviceAccountName: "trivy-operator"
+      
+      # ===========================================================================
+      # Tolerations - Allow scheduling on tainted nodes
+      # ===========================================================================
+      # Tolerations allow the scan job to run on nodes with matching taints.
+      # Without these, the job would be rejected by tainted nodes.
+      tolerations:
+        # Tolerate nodes dedicated for security scanning
+        - key: "security-scanning"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        
+        # Tolerate nodes designated for batch workloads
+        - key: "node-role.kubernetes.io/batch"
+          operator: "Exists"
+          effect: "NoSchedule"
+      
+      # ===========================================================================
+      # Node Selector - Simple key-value node selection
+      # ===========================================================================
+      # Node selector provides simple node selection using exact key-value matches.
+      # All conditions must be met for the pod to be scheduled.
+      nodeSelector:
+        nodeType: "security-scanner"
+        diskType: "ssd"
+      
+      # ===========================================================================
+      # Node Affinity - Advanced node selection rules
+      # ===========================================================================
+      # Node affinity provides more expressive node selection with required and
+      # preferred rules.
+      nodeAffinity:
+        # REQUIRED: Pod will NOT be scheduled unless these conditions are met
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            # Pod must run on nodes with security or batch role
+            - matchExpressions:
+                - key: "node-role.kubernetes.io/security"
+                  operator: In
+                  values:
+                    - "scanner"
+                    - "batch"
+        
+        # PREFERRED: Scheduler will try to satisfy these, but not required
+        preferredDuringSchedulingIgnoredDuringExecution:
+          # Prefer nodes with SSD storage (weight 100)
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: "diskType"
+                  operator: In
+                  values:
+                    - "ssd"
+          
+          # Prefer nodes in specific availability zone (weight 50)
+          - weight: 50
+            preference:
+              matchExpressions:
+                - key: "topology.kubernetes.io/zone"
+                  operator: In
+                  values:
+                    - "us-east-1a"
+                    - "us-east-1b"
+      
+      # ===========================================================================
+      # Pod Affinity - Co-locate with other pods (optional)
+      # ===========================================================================
+      # Pod affinity schedules pods on nodes where specific other pods are running.
+      # Uncomment if you want scan jobs near Trivy operator components.
+      podAffinity: {}
+      # requiredDuringSchedulingIgnoredDuringExecution:
+      #   - labelSelector:
+      #       matchExpressions:
+      #         - key: "app"
+      #           operator: In
+      #           values:
+      #             - "trivy-operator"
+      #     topologyKey: "kubernetes.io/hostname"
+      
+      # ===========================================================================
+      # Pod Anti-Affinity - Avoid co-location with other pods
+      # ===========================================================================
+      # Pod anti-affinity prevents multiple scan jobs from running on the same node,
+      # distributing the workload and avoiding resource contention.
+      podAntiAffinity:
+        # PREFERRED: Try to avoid, but not strictly required
+        preferredDuringSchedulingIgnoredDuringExecution:
+          # Avoid nodes where other Trivy scan jobs are running
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: "moai.forge.io/security-tool"
+                    operator: In
+                    values:
+                      - "trivy"
+              # Spread across nodes (hostname)
+              topologyKey: "kubernetes.io/hostname"
+          
+          # Also spread across availability zones for redundancy
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: "moai.forge.io/security-tool"
+                    operator: In
+                    values:
+                      - "trivy"
+              # Spread across zones
+              topologyKey: "topology.kubernetes.io/zone"
+      
+      # ===========================================================================
+      # Resources
+      # ===========================================================================
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+      
+      # Job history limits
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+      
+      # Concurrency policy - don't run multiple jobs simultaneously
+      concurrencyPolicy: "Forbid"
+
+# ===========================================================================
+# Summary of Scheduling Behavior
+# ===========================================================================
+#
+# With this configuration, the Trivy scan job will:
+#
+# 1. ONLY run on nodes with:
+#    - Taint: security-scanning=true:NoSchedule (via tolerations)
+#    - Taint: node-role.kubernetes.io/batch:NoSchedule (via tolerations)
+#    - Label: node-role.kubernetes.io/security=scanner (via nodeAffinity - REQUIRED)
+#    - Label: nodeType=security-scanner (via nodeSelector - REQUIRED)
+#    - Label: diskType=ssd (via nodeSelector - REQUIRED)
+#
+# 2. PREFER nodes with:
+#    - Label: diskType=ssd (weight 100)
+#    - Label: topology.kubernetes.io/zone=us-east-1a/us-east-1b (weight 50)
+#
+# 3. AVOID nodes that already have:
+#    - Other Trivy scan jobs running (spread across nodes)
+#    - Existing scans in the same availability zone (spread across zones)
+#
+# This ensures:
+# - Scans run only on dedicated, high-performance nodes
+# - Workload is distributed across nodes to prevent resource exhaustion
+# - SSD storage is preferred for faster scanning
+# - Multiple availability zones are utilized for redundancy

@@ -1,0 +1,69 @@
+apiVersion: v2
+name: common-kyverno
+description: |
+  Forge Common Library for Kyverno policy governance.
+  
+  Provides reusable templates for:
+    - ClusterPolicy (cluster-wide policy enforcement)
+    - Policy (namespace-scoped policy enforcement)
+    - PolicyReport and ClusterPolicyReport integration
+    - Common policy patterns (security, best practices, compliance)
+    - API restrictions (block kubectl exec, attach, port-forward, debug)
+    - Resource management restrictions (GitOps-only deployments)
+  
+  Features:
+    - Security policies (no privileged containers, enforce read-only root, etc.)
+    - API restrictions (block dangerous kubectl operations)
+    - Resource management (block direct kubectl apply/create/delete)
+    - GitOps-only pattern (only operators and deployment jobs can modify resources)
+    - Best practice policies (required labels, resource limits, pod security)
+    - Compliance policies (regulatory requirements, audit logging)
+    - Image verification (signed images, trusted registries)
+    - Mutation policies (auto-inject sidecars, set defaults)
+    - Generation policies (auto-create NetworkPolicies, RBAC)
+  
+  Compatible with:
+    - Kyverno 1.10+ (tested with 1.11.0)
+    - Kubernetes 1.23-1.29
+    - Pod Security Standards (PSS)
+    - Flux CD, ArgoCD, Helm Operator
+
+type: library
+version: 0.1.0
+appVersion: "1.11.0"
+
+keywords:
+  - library
+  - forge
+  - kyverno
+  - policy
+  - governance
+  - security
+  - compliance
+  - pss
+  - admission-control
+  - api-restrictions
+  - kubectl-exec
+  - gitops
+  - resource-management
+
+maintainers:
+  - name: Forge Platform Team
+    email: platform@forge.example.com
+
+home: https://kyverno.io
+sources:
+  - https://github.com/kyverno/kyverno
+
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "policy-governance"
+  moai.forge.io/category: "security"
+  moai.forge.io/kyverno-version: "1.11.0"
+  moai.forge.io/features: "api-restrictions,security-policies,compliance,pss,resource-management,gitops"
+  moai.forge.io/pss-level: "restricted"

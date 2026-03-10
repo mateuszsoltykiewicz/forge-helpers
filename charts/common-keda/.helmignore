@@ -1,0 +1,34 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+.svn/
+.hg/
+.bzr/
+
+# Backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Test files
+test/
+tests/
+*.test.yaml

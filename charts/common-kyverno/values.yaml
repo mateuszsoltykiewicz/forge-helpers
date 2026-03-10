@@ -1,0 +1,394 @@
+# ==============================================================================
+# Forge Common Library - Kyverno Configuration
+# ==============================================================================
+# Configuration for Kyverno policy governance.
+#
+# This library provides:
+#   1. ClusterPolicy - cluster-wide policy enforcement
+#   2. Policy - namespace-scoped policy enforcement
+#   3. Pre-configured security policies (PSS Baseline/Restricted)
+#   4. Best practice policies (labels, resource limits, image tags)
+#   5. Mutation policies (auto-inject annotations, set defaults)
+#   6. Generation policies (auto-create NetworkPolicies, RBAC)
+#
+# Compatible with:
+#   - Kyverno 1.10+ (tested with 1.11.0)
+#   - Kubernetes 1.23-1.29
+#   - Pod Security Standards (PSS)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Kyverno ClusterPolicy Configuration
+# ------------------------------------------------------------------------------
+kyverno:
+  # Custom ClusterPolicy (cluster-wide)
+  clusterpolicy:
+    enabled: false
+    name: ""
+    title: "Forge Security Policy"
+    category: "Security"
+    severity: "medium"
+    description: "Forge platform security policy"
+    validationFailureAction: "audit"  # audit or enforce
+    background: true
+    failurePolicy: "Fail"  # Fail or Ignore
+    webhookTimeoutSeconds: 10
+    
+    # Custom policy rules
+    rules: []
+      # Example: Require specific labels
+      # - name: check-labels
+      #   match:
+      #     any:
+      #       - resources:
+      #           kinds:
+      #             - Deployment
+      #   validate:
+      #     message: "Label 'team' is required"
+      #     pattern:
+      #       metadata:
+      #         labels:
+      #           team: "?*"
+    
+    labels: {}
+    annotations: {}
+
+  # Custom Policy (namespace-scoped)
+  policy:
+    enabled: false
+    name: ""
+    title: "Namespace Policy"
+    category: "Custom"
+    severity: "medium"
+    description: "Namespace-specific policy"
+    validationFailureAction: "audit"
+    background: true
+    failurePolicy: "Fail"  # Fail or Ignore
+    webhookTimeoutSeconds: 10
+    
+    # Custom policy rules
+    rules: []
+    
+    labels: {}
+    annotations: {}
+
+  # ------------------------------------------------------------------------------
+  # Pre-configured Security Policies
+  # ------------------------------------------------------------------------------
+  policies:
+    # Require containers to run as non-root user
+    requireNonRoot:
+      enabled: false
+      action: "audit"  # audit or enforce
+
+    # Disallow privileged containers
+    disallowPrivileged:
+      enabled: false
+      action: "enforce"
+
+    # Require resource limits (CPU and memory)
+    requireResourceLimits:
+      enabled: false
+      action: "audit"
+
+    # Require read-only root filesystem
+    requireReadOnlyRoot:
+      enabled: false
+      action: "audit"
+
+    # Require Forge labels on resources
+    requireForgeLabels:
+      enabled: false
+      action: "audit"
+
+    # Disallow :latest image tag
+    disallowLatestTag:
+      enabled: false
+      action: "audit"
+
+    # Auto-generate default deny NetworkPolicy for new namespaces
+    addDefaultNetworkPolicy:
+      enabled: false
+
+  # ------------------------------------------------------------------------------
+  # Environment-Specific Policies
+  # ------------------------------------------------------------------------------
+  environments:
+    # Development environment (relaxed policies)
+    development:
+      enabled: false
+
+    # Production environment (strict policies)
+    production:
+      enabled: false
+
+  # ------------------------------------------------------------------------------
+  # Mutation Policies
+  # ------------------------------------------------------------------------------
+  mutations:
+    # Auto-add Prometheus monitoring annotations to Services
+    addMonitoringAnnotations:
+      enabled: false
+
+  # ------------------------------------------------------------------------------
+  # API Restrictions (Block kubectl exec, attach, port-forward, etc.)
+  # ------------------------------------------------------------------------------
+  apiRestrictions:
+    # Block kubectl exec (pods/exec)
+    blockExec:
+      enabled: false
+      action: "enforce"  # enforce or audit
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "kubectl exec is not allowed in this cluster. Use proper debugging and monitoring tools instead. Contact your cluster administrator for assistance."
+      
+      # Include only specific namespaces (empty = all namespaces)
+      includeNamespaces: []
+      # - production
+      # - staging
+      
+      # Exclude specific namespaces
+      excludeNamespaces: []
+      # - kube-system
+      # - kube-public
+      # - development
+      
+      # Exclude specific users (by name)
+      excludeUsers: []
+      # - cluster-admin
+      # - sre-team
+      
+      # Exclude specific service accounts
+      excludeServiceAccounts: []
+      # - system:serviceaccount:kube-system:kubernetes-dashboard
+      
+      # Additional annotations
+      annotations: {}
+    
+    # Block kubectl attach (pods/attach)
+    blockAttach:
+      enabled: false
+      action: "enforce"
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "kubectl attach is not allowed in this cluster. Use kubectl logs for log streaming."
+      includeNamespaces: []
+      excludeNamespaces: []
+      excludeUsers: []
+      excludeServiceAccounts: []
+      annotations: {}
+    
+    # Block kubectl port-forward (pods/portforward)
+    blockPortForward:
+      enabled: false
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: "kubectl port-forward is not allowed in this cluster. Use proper Ingress or Service resources."
+      includeNamespaces: []
+      excludeNamespaces: []
+      excludeUsers: []
+      excludeServiceAccounts: []
+      annotations: {}
+    
+    # Block kubectl proxy (pods/proxy)
+    blockProxy:
+      enabled: false
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: "kubectl proxy to pods is not allowed in this cluster."
+      includeNamespaces: []
+      excludeNamespaces: []
+      excludeUsers: []
+      excludeServiceAccounts: []
+      annotations: {}
+    
+    # Block ephemeral containers (kubectl debug)
+    blockEphemeralContainers:
+      enabled: false
+      action: "enforce"
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "Ephemeral containers (kubectl debug) are not allowed in this cluster."
+      includeNamespaces: []
+      excludeNamespaces: []
+      excludeUsers: []
+      excludeServiceAccounts: []
+      annotations: {}
+
+  # ------------------------------------------------------------------------------
+  # Debug Proxy Configuration (Controlled Pod Access)
+  # ------------------------------------------------------------------------------
+  debugProxy:
+    # Enable debug proxy infrastructure
+    enabled: false
+    
+    # ServiceAccount name
+    serviceAccountName: "debug-proxy"
+    
+    # ServiceAccount annotations
+    serviceAccountAnnotations: {}
+    
+    # Allow attach (in addition to exec)
+    allowAttach: false
+    
+    # Allow port-forward (in addition to exec)
+    allowPortForward: false
+    
+    # Allow users to create debug jobs
+    allowJobCreation: true
+    
+    # Users allowed to create debug jobs
+    allowedUsers: []
+    # - alice@company.com
+    # - bob@company.com
+    
+    # Groups allowed to create debug jobs
+    allowedGroups: []
+    # - sre-team
+    # - platform-team
+    
+    # ServiceAccounts allowed to create debug jobs
+    allowedServiceAccounts: []
+    # - ci-cd-bot
+    
+    # Namespace for allowed ServiceAccounts
+    allowedServiceAccountNamespace: ""
+
+  # ==============================================================================
+  # Resource Management Restrictions
+  # ==============================================================================
+  # Block direct resource modifications by users (GitOps-only pattern)
+  # Only operators and deployment jobs can manage Kubernetes resources
+  
+  resourceManagement:
+    # Block workload modifications (Deployments, StatefulSets, DaemonSets)
+    blockWorkloadModifications:
+      enabled: false
+      action: "enforce"  # enforce or audit
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "Direct workload modifications are not allowed. Use Helm charts deployed via operators or deployment jobs. Contact your GitOps team for deployments."
+      
+      # Exclude system namespaces
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+      
+      # Exclude operator ServiceAccounts (Helm, Flux, ArgoCD, etc.)
+      excludeServiceAccounts:
+        - "system:serviceaccount:flux-system:flux"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:default:helm-operator"
+        - "system:serviceaccount:ci-cd:deployment-job"
+      
+      # Exclude break-glass users
+      excludeUsers:
+        - "cluster-admin"
+      
+      annotations: {}
+    
+    # Block networking modifications (Services, Ingresses, NetworkPolicies)
+    blockNetworkingModifications:
+      enabled: false
+      action: "enforce"
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "Direct networking modifications are not allowed. Use Helm charts deployed via operators. Contact your GitOps team for network changes."
+      
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+      
+      excludeServiceAccounts:
+        - "system:serviceaccount:flux-system:flux"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:default:helm-operator"
+        - "system:serviceaccount:ci-cd:deployment-job"
+      
+      excludeUsers:
+        - "cluster-admin"
+      
+      annotations: {}
+    
+    # Block configuration modifications (ConfigMaps, Secrets)
+    blockConfigModifications:
+      enabled: false
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: "Direct configuration modifications are not allowed. Use Helm charts deployed via operators or deployment jobs. Secrets should be managed via External Secrets Operator."
+      
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+      
+      excludeServiceAccounts:
+        - "system:serviceaccount:flux-system:flux"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:default:helm-operator"
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:external-secrets:external-secrets"
+      
+      excludeUsers:
+        - "cluster-admin"
+      
+      annotations: {}
+    
+    # Block storage modifications (PVCs, PVs)
+    blockStorageModifications:
+      enabled: false
+      action: "enforce"
+      severity: "high"
+      failurePolicy: "Fail"
+      message: "Direct storage modifications are not allowed. Use Helm charts deployed via operators. Contact your platform team for storage provisioning."
+      
+      excludeNamespaces:
+        - kube-system
+      
+      excludeServiceAccounts:
+        - "system:serviceaccount:flux-system:flux"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:default:helm-operator"
+        - "system:serviceaccount:ci-cd:deployment-job"
+      
+      excludeUsers:
+        - "cluster-admin"
+      
+      annotations: {}
+    
+    # Block RBAC modifications (Roles, RoleBindings, ClusterRoles, ClusterRoleBindings)
+    blockRBACModifications:
+      enabled: false
+      action: "enforce"
+      severity: "critical"
+      failurePolicy: "Fail"
+      message: "Direct RBAC modifications are not allowed. Contact cluster administrators or open a ticket for permission changes."
+      
+      excludeNamespaces:
+        - kube-system
+      
+      excludeServiceAccounts:
+        - "system:serviceaccount:flux-system:flux"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:default:helm-operator"
+      
+      excludeUsers:
+        - "cluster-admin"
+        - "admin"
+      
+      annotations: {}
+
+# ------------------------------------------------------------------------------
+# Common Configuration (inherited from common-forge)
+# ------------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+# Custom labels for all resources
+labels: {}
+
+# Custom annotations for all resources
+annotations: {}

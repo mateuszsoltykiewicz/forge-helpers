@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common ArgoCD Configuration",
+  "description": "JSON Schema for validating ArgoCD library chart configuration",
+  "type": "object",
+  "properties": {
+    "argocd": {
+      "type": "object",
+      "properties": {
+        "application": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "namespace": {"type": "string"},
+            "project": {"type": "string"},
+            "source": {
+              "type": "object",
+              "properties": {
+                "repoURL": {"type": "string"},
+                "targetRevision": {"type": "string"},
+                "path": {"type": "string"},
+                "chart": {"type": "string"},
+                "helm": {
+                  "type": "object",
+                  "properties": {
+                    "releaseName": {"type": "string"},
+                    "values": {"type": "string"},
+                    "valueFiles": {"type": "array", "items": {"type": "string"}},
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {"type": "string"},
+                          "value": {"type": "string"},
+                          "forceString": {"type": "boolean"}
+                        },
+                        "required": ["name", "value"]
+                      }
+                    },
+                    "fileParameters": {"type": "array"},
+                    "version": {"type": "string"},
+                    "passCredentials": {"type": "boolean"},
+                    "skipCrds": {"type": "boolean"}
+                  }
+                },
+                "kustomize": {"type": "object"},
+                "directory": {"type": "object"}
+              }
+            },
+            "destination": {
+              "type": "object",
+              "properties": {
+                "server": {"type": "string"},
+                "name": {"type": "string"},
+                "namespace": {"type": "string"}
+              }
+            },
+            "syncPolicy": {
+              "type": "object",
+              "properties": {
+                "automated": {
+                  "type": "object",
+                  "properties": {
+                    "prune": {"type": "boolean"},
+                    "selfHeal": {"type": "boolean"},
+                    "allowEmpty": {"type": "boolean"}
+                  }
+                },
+                "syncOptions": {"type": "array", "items": {"type": "string"}},
+                "retry": {
+                  "type": "object",
+                  "properties": {
+                    "limit": {"type": "integer", "minimum": 0},
+                    "backoff": {
+                      "type": "object",
+                      "properties": {
+                        "duration": {"type": "string"},
+                        "factor": {"type": "integer", "minimum": 1},
+                        "maxDuration": {"type": "string"}
+                      }
+                    }
+                  }
+                },
+                "managedNamespaceMetadata": {"type": "object"}
+              }
+            },
+            "ignoreDifferences": {"type": "array"},
+            "info": {"type": "array"},
+            "revisionHistoryLimit": {"type": "integer", "minimum": 0},
+            "finalizers": {"type": "array", "items": {"type": "string"}},
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        },
+        "applicationset": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "namespace": {"type": "string"},
+            "generators": {
+              "type": "object",
+              "properties": {
+                "list": {
+                  "type": "object",
+                  "properties": {
+                    "elements": {
+                      "type": "array",
+                      "items": {"type": "object"}
+                    },
+                    "template": {"type": "object"}
+                  }
+                },
+                "git": {
+                  "type": "object",
+                  "properties": {
+                    "repoURL": {"type": "string"},
+                    "revision": {"type": "string"},
+                    "directories": {"type": "array"},
+                    "files": {"type": "array"},
+                    "template": {"type": "object"}
+                  }
+                },
+                "cluster": {
+                  "type": "object",
+                  "properties": {
+                    "selector": {"type": "object"},
+                    "values": {"type": "object"},
+                    "template": {"type": "object"}
+                  }
+                },
+                "matrix": {
+                  "type": "object",
+                  "properties": {
+                    "generators": {"type": "array"},
+                    "template": {"type": "object"}
+                  }
+                },
+                "merge": {
+                  "type": "object",
+                  "properties": {
+                    "mergeKeys": {"type": "array", "items": {"type": "string"}},
+                    "generators": {"type": "array"},
+                    "template": {"type": "object"}
+                  }
+                },
+                "pullRequest": {"type": "object"},
+                "scmProvider": {"type": "object"},
+                "custom": {"type": "array"}
+              }
+            },
+            "template": {
+              "type": "object",
+              "properties": {
+                "metadata": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "namespace": {"type": "string"},
+                    "labels": {"type": "object"},
+                    "annotations": {"type": "object"},
+                    "finalizers": {"type": "array"}
+                  }
+                },
+                "spec": {
+                  "type": "object",
+                  "properties": {
+                    "project": {"type": "string"},
+                    "source": {"type": "object"},
+                    "destination": {"type": "object"},
+                    "syncPolicy": {"type": "object"},
+                    "ignoreDifferences": {"type": "array"},
+                    "info": {"type": "array"},
+                    "revisionHistoryLimit": {"type": "integer", "minimum": 0}
+                  }
+                }
+              }
+            },
+            "syncPolicy": {
+              "type": "object",
+              "properties": {
+                "preserveResourcesOnDeletion": {"type": "boolean"},
+                "applicationsSync": {
+                  "type": "string",
+                  "enum": ["sync", "create-only", "create-update", "create-delete"]
+                }
+              }
+            },
+            "strategy": {"type": "object"},
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        }
+      }
+    }
+  }
+}

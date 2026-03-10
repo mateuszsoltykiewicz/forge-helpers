@@ -1,0 +1,46 @@
+apiVersion: v2
+name: common-forge
+description: |
+  Forge Foundation Library - Core naming conventions, semantic validation, and helper functions
+  for the Forge platform. Provides standardized patterns for Kubernetes resource naming, labels,
+  and validation across all Forge charts.
+  
+  This library includes:
+  - 8 naming patterns (Forge and customer resources)
+  - Kubernetes semantic validation (DNS-1123, DNS-1035, labels, annotations)
+  - Semantic helpers (case conversions, sanitization, quoting)
+  - Forge and Kubernetes standard labels
+  - Utility functions for all Forge charts
+  
+  Usage:
+    Add as a dependency in your Chart.yaml:
+    
+    dependencies:
+      - name: common-forge
+        version: "~0.1.0"
+        repository: "file://../common-forge"
+
+type: library
+version: 0.1.0
+appVersion: "1.0"
+
+keywords:
+  - library
+  - forge
+  - foundation
+  - naming
+  - validation
+  - kubernetes
+
+home: https://github.com/forge/forge-helpers
+sources:
+  - https://github.com/forge/forge-helpers/tree/main/charts/common-forge
+
+maintainers:
+  - name: Forge Team
+    email: forge@example.com
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "foundation"
+  moai.forge.io/platform-version: "1.0"

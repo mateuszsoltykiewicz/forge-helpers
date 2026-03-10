@@ -1,0 +1,320 @@
+# ==============================================================================
+# Kyverno API Restrictions - Development/Staging Configuration Example
+# ==============================================================================
+#
+# This example demonstrates how to use audit mode to monitor dangerous
+# Kubernetes API operations without blocking them.
+#
+# Use Cases:
+#   - Development clusters (monitor, don't block)
+#   - Staging clusters (preparation for production)
+#   - Initial rollout (gather data before enforcement)
+#   - Training environments (educate users)
+#
+# Benefits of Audit Mode:
+#   - No disruption to developers
+#   - Identify who uses kubectl exec/attach/port-forward
+#   - Measure impact before enforcement
+#   - Generate compliance reports
+#
+# ==============================================================================
+
+kyverno:
+  # ===========================================================================
+  # API Restrictions Configuration (Audit Mode)
+  # ===========================================================================
+  apiRestrictions:
+    
+    # -------------------------------------------------------------------------
+    # Monitor kubectl exec (audit only, don't block)
+    # -------------------------------------------------------------------------
+    blockExec:
+      enabled: true
+      action: audit  # Log violations without blocking
+      severity: high
+      
+      message: |
+        ℹ️  kubectl exec usage detected (audit mode - not blocked)
+        
+        This operation will be blocked in production clusters.
+        Consider using alternatives:
+        - kubectl logs for log viewing
+        - Telepresence for local debugging
+        - kubectl debug for ephemeral containers
+      
+      # Monitor only production-like namespaces
+      includeNamespaces:
+        - staging
+        - stage-*
+      
+      # Exclude development namespaces
+      excludeNamespaces:
+        - development
+        - dev-*
+        - sandbox
+        - kube-system
+      
+      annotations:
+        policy.company.com/mode: "audit"
+        policy.company.com/rollout-phase: "1-monitoring"
+    
+    # -------------------------------------------------------------------------
+    # Monitor kubectl attach
+    # -------------------------------------------------------------------------
+    blockAttach:
+      enabled: true
+      action: audit
+      severity: high
+      
+      message: "kubectl attach usage detected (audit mode)"
+      
+      includeNamespaces:
+        - staging
+        - stage-*
+      
+      excludeNamespaces:
+        - development
+        - dev-*
+        - kube-system
+      
+      annotations:
+        policy.company.com/mode: "audit"
+    
+    # -------------------------------------------------------------------------
+    # Monitor kubectl port-forward
+    # -------------------------------------------------------------------------
+    blockPortForward:
+      enabled: true
+      action: audit
+      severity: medium
+      
+      message: |
+        ℹ️  kubectl port-forward usage detected (audit mode)
+        
+        In production, use proper Service/Ingress resources instead.
+      
+      includeNamespaces:
+        - staging
+        - stage-*
+      
+      excludeNamespaces:
+        - development
+        - dev-*
+      
+      annotations:
+        policy.company.com/mode: "audit"
+    
+    # -------------------------------------------------------------------------
+    # Monitor kubectl proxy
+    # -------------------------------------------------------------------------
+    blockProxy:
+      enabled: true
+      action: audit
+      severity: medium
+      
+      message: "kubectl proxy usage detected (audit mode)"
+      
+      includeNamespaces:
+        - staging
+        - stage-*
+      
+      annotations:
+        policy.company.com/mode: "audit"
+    
+    # -------------------------------------------------------------------------
+    # Monitor ephemeral containers (kubectl debug)
+    # -------------------------------------------------------------------------
+    blockEphemeralContainers:
+      enabled: true
+      action: audit
+      severity: high
+      
+      message: "kubectl debug (ephemeral container) usage detected (audit mode)"
+      
+      includeNamespaces:
+        - staging
+        - stage-*
+      
+      annotations:
+        policy.company.com/mode: "audit"
+
+# ==============================================================================
+# How to Use Audit Mode
+# ==============================================================================
+#
+# 1. Deploy with audit mode (Phase 1: Weeks 1-2):
+#    helm upgrade myapp . -f api-restrictions-staging.yaml
+#
+# 2. Monitor PolicyReports:
+#    # List all policy reports
+#    kubectl get polr -A
+#    
+#    # View violations in staging namespace
+#    kubectl get polr -n staging -o yaml
+#    
+#    # Get summary of violations
+#    kubectl get polr -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.summary.fail}{"\t"}{.summary.pass}{"\n"}{end}'
+#
+# 3. Generate usage report:
+#    # Who is using kubectl exec?
+#    kubectl get polr -A -o json | jq -r '.items[] | select(.results[] | select(.policy=="block-pod-exec")) | .metadata.namespace'
+#    
+#    # How many violations per namespace?
+#    kubectl get polr -A -o json | jq -r '.items[] | "\(.metadata.namespace): \(.summary.fail) violations"'
+#
+# 4. Analyze patterns (Phase 2: Week 3):
+#    - Which teams use kubectl exec most?
+#    - Which services require exec access?
+#    - Are there legitimate use cases?
+#    - Can we provide alternatives?
+#
+# 5. Communicate with teams (Phase 3: Week 4):
+#    - Share usage reports
+#    - Educate on alternatives
+#    - Document proper debugging procedures
+#    - Set enforcement date
+#
+# 6. Enforce policies (Phase 4: Week 5+):
+#    action: enforce  # Change from audit to enforce
+#
+# ==============================================================================
+# Monitoring Audit Events
+# ==============================================================================
+#
+# 1. Prometheus metrics:
+#    kyverno_policy_results_total{policy_type="validate",policy_name="block-pod-exec",status="fail"}
+#
+# 2. Grafana queries:
+#    # Violation rate over time
+#    rate(kyverno_policy_results_total{status="fail"}[5m])
+#    
+#    # Top violated policies
+#    topk(5, sum by (policy_name) (kyverno_policy_results_total{status="fail"}))
+#
+# 3. Alert on high violation rate:
+#    - alert: HighKubectlExecUsage
+#      expr: |
+#        rate(kyverno_policy_results_total{
+#          policy_name="block-pod-exec",
+#          status="fail"
+#        }[1h]) > 10
+#      annotations:
+#        summary: "High kubectl exec usage detected"
+#        description: "{{ $value }} exec attempts per second"
+#
+# ==============================================================================
+# Export PolicyReports to SIEM
+# ==============================================================================
+#
+# 1. FluentD configuration:
+#    <source>
+#      @type kubernetes_metadata
+#      tag kyverno.policyreport
+#      @id in_kyverno_policyreport
+#    </source>
+#    
+#    <filter kyverno.policyreport>
+#      @type grep
+#      <regexp>
+#        key $.kind
+#        pattern PolicyReport
+#      </regexp>
+#    </filter>
+#
+# 2. Elasticsearch index:
+#    PUT /kyverno-policy-reports
+#    {
+#      "mappings": {
+#        "properties": {
+#          "timestamp": { "type": "date" },
+#          "namespace": { "type": "keyword" },
+#          "policy": { "type": "keyword" },
+#          "resource": { "type": "keyword" },
+#          "result": { "type": "keyword" },
+#          "message": { "type": "text" }
+#        }
+#      }
+#    }
+#
+# 3. Splunk query:
+#    index=kubernetes sourcetype=kyverno:policyreport
+#    | stats count by policy, result, namespace
+#    | where result="fail"
+#
+# ==============================================================================
+# Gradual Rollout Strategy
+# ==============================================================================
+#
+# Phase 1 (Weeks 1-2): Audit Mode - Monitor All
+#   action: audit
+#   includeNamespaces: [staging, stage-*]
+#   Goal: Gather baseline data
+#
+# Phase 2 (Week 3): Audit Mode - Analyze
+#   - Review PolicyReports
+#   - Identify top violators
+#   - Document use cases
+#   - Create alternatives documentation
+#
+# Phase 3 (Week 4): Communication
+#   - Email teams with usage reports
+#   - Share alternatives documentation
+#   - Announce enforcement date
+#   - Provide training sessions
+#
+# Phase 4 (Week 5-6): Staged Enforcement
+#   # Week 5: Enforce in staging
+#   includeNamespaces: [staging, stage-*]
+#   action: enforce
+#   
+#   # Week 6: Enforce in production
+#   includeNamespaces: [production, prod-*]
+#   action: enforce
+#
+# Phase 5 (Week 7+): Full Enforcement
+#   - All namespaces enforced
+#   - Monitor for break-glass requests
+#   - Regular compliance reports
+#
+# ==============================================================================
+# Developer Education
+# ==============================================================================
+#
+# Share this documentation with developers:
+#
+# ❌ BLOCKED: kubectl exec -it pod-name -- /bin/bash
+# ✅ ALTERNATIVE: kubectl logs -f pod-name
+# ✅ ALTERNATIVE: telepresence intercept deployment-name
+#
+# ❌ BLOCKED: kubectl port-forward pod-name 8080:80
+# ✅ ALTERNATIVE: Create Ingress resource
+# ✅ ALTERNATIVE: Use LoadBalancer Service
+# ✅ ALTERNATIVE: telepresence intercept deployment-name --port 8080:80
+#
+# ❌ BLOCKED: kubectl debug pod-name --image=busybox
+# ✅ ALTERNATIVE: kubectl logs pod-name
+# ✅ ALTERNATIVE: Add debugging sidecar to deployment
+#
+# ==============================================================================
+# Success Metrics
+# ==============================================================================
+#
+# Track these metrics to measure success:
+#
+# 1. Violation Rate:
+#    - Baseline (Week 1): X violations/day
+#    - Target (Week 8): <10 violations/day
+#
+# 2. User Adoption:
+#    - % of teams using alternatives (Telepresence, proper logging)
+#    - % reduction in kubectl exec usage
+#
+# 3. Compliance:
+#    - % of namespaces with policies enforced
+#    - % of violations resolved within SLA
+#
+# 4. Security Posture:
+#    - # of unauthorized access attempts blocked
+#    - # of security incidents involving pod access
+#
+# ==============================================================================

@@ -1,0 +1,50 @@
+apiVersion: v2
+name: common-kubernetes
+description: |
+  Kubernetes resource templates library for Forge platform.
+  Comprehensive collection of K8s resource templates with Vault integration,
+  security contexts, and Forge platform patterns.
+  
+  Features:
+  - Workload resources (Deployment, StatefulSet, DaemonSet, Job, CronJob)
+  - Service & Networking (Service, Ingress, NetworkPolicy)
+  - Configuration & Storage (ConfigMap, Secret, PVC)
+  - RBAC (ServiceAccount, Role, RoleBinding, ClusterRole, ClusterRoleBinding)
+  - Autoscaling (HPA, VPA, PDB)
+  - Monitoring (PodMonitor)
+  - Full Vault Agent Injector support
+  - Security contexts (PSS baseline/restricted)
+  - Probe configurations (startup, liveness, readiness)
+  - Resource management (requests, limits)
+  - Init containers support
+
+type: library
+version: 0.1.0
+appVersion: "1.29.0"  # Kubernetes version
+
+keywords:
+  - library
+  - forge
+  - kubernetes
+  - deployment
+  - service
+  - statefulset
+  - vault
+  - security
+
+maintainers:
+  - name: Forge Team
+    email: forge@example.com
+
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+  - name: common-vault
+    version: ~0.1.0
+    repository: file://../common-vault
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "kubernetes"
+  moai.forge.io/integration: "kubernetes"

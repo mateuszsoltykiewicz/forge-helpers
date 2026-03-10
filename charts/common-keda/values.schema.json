@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common KEDA Configuration",
+  "description": "KEDA (Kubernetes Event-Driven Autoscaling) integration for ScaledObject and ScaledJob",
+  "type": "object",
+  "properties": {
+    "keda": {
+      "type": "object",
+      "properties": {
+        "scaledobject": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "scaleTargetRef": {"type": "object"},
+            "pollingInterval": {"type": "integer", "minimum": 1},
+            "cooldownPeriod": {"type": "integer", "minimum": 0},
+            "idleReplicaCount": {"type": "integer", "minimum": 0},
+            "minReplicaCount": {"type": "integer", "minimum": 0},
+            "maxReplicaCount": {"type": "integer", "minimum": 1},
+            "advanced": {"type": "object"},
+            "fallback": {
+              "type": "object",
+              "properties": {
+                "failureThreshold": {"type": "integer", "minimum": 1},
+                "replicas": {"type": "integer", "minimum": 0}
+              }
+            },
+            "triggers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "prometheus",
+                      "rabbitmq",
+                      "aws-sqs-queue",
+                      "kafka",
+                      "redis",
+                      "cron",
+                      "postgresql",
+                      "mysql",
+                      "mongodb",
+                      "azure-queue",
+                      "gcp-pubsub",
+                      "http"
+                    ]
+                  },
+                  "name": {"type": "string"},
+                  "metadata": {"type": "object"},
+                  "authenticationRef": {"type": "object"},
+                  "metricType": {"type": "string", "enum": ["AverageValue", "Value", "Utilization"]}
+                },
+                "required": ["type", "metadata"]
+              }
+            },
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        },
+        "scaledjob": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "jobTargetRef": {"type": "object"},
+            "pollingInterval": {"type": "integer", "minimum": 1},
+            "successfulJobsHistoryLimit": {"type": "integer", "minimum": 0},
+            "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
+            "maxReplicaCount": {"type": "integer", "minimum": 1},
+            "scalingStrategy": {
+              "type": "object",
+              "properties": {
+                "strategy": {"type": "string", "enum": ["default", "custom", "accurate"]},
+                "customScalingQueueLengthDeduction": {"type": "integer"},
+                "customScalingRunningJobPercentage": {"type": "string"}
+              }
+            },
+            "rolloutStrategy": {"type": "string", "enum": ["gradual", "immediate"]},
+            "triggers": {"type": "array"},
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"},
+            "rabbitmq": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "host": {"type": "string"},
+                "queueName": {"type": "string"},
+                "messagesPerJob": {"type": "integer", "minimum": 1},
+                "pollingInterval": {"type": "integer", "minimum": 1},
+                "maxReplicaCount": {"type": "integer", "minimum": 1},
+                "scalingStrategy": {"type": "string"},
+                "authenticationRef": {"type": "object"}
+              }
+            },
+            "sqs": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "queueURL": {"type": "string"},
+                "awsRegion": {"type": "string"},
+                "messagesPerJob": {"type": "integer", "minimum": 1},
+                "pollingInterval": {"type": "integer", "minimum": 1},
+                "maxReplicaCount": {"type": "integer", "minimum": 1},
+                "scalingStrategy": {"type": "string"},
+                "authenticationRef": {"type": "object"}
+              }
+            },
+            "database": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "type": {"type": "string", "enum": ["postgresql", "mysql", "mongodb"]},
+                "query": {"type": "string"},
+                "recordsPerJob": {"type": "integer", "minimum": 1},
+                "pollingInterval": {"type": "integer", "minimum": 1},
+                "maxReplicaCount": {"type": "integer", "minimum": 1},
+                "scalingStrategy": {"type": "string"},
+                "connectionFromEnv": {"type": "string"},
+                "authenticationRef": {"type": "object"}
+              }
+            }
+          }
+        },
+        "triggerAuthentication": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "secretTargetRef": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {"type": "string"},
+                  "name": {"type": "string"},
+                  "key": {"type": "string"}
+                },
+                "required": ["parameter", "name", "key"]
+              }
+            },
+            "env": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {"type": "string"},
+                  "name": {"type": "string"},
+                  "containerName": {"type": "string"}
+                },
+                "required": ["parameter", "name"]
+              }
+            },
+            "podIdentity": {"type": "object"},
+            "hashiCorpVault": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        }
+      }
+    },
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "labels": {"type": "object"},
+    "annotations": {"type": "object"}
+  }
+}

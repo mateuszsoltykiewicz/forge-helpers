@@ -1,0 +1,382 @@
+# GitOps-Only Pattern: Resource Management Restrictions
+# Block all direct kubectl apply/create/delete by users
+# Only operators and deployment jobs can manage resources
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyverno-resource-management-config
+  namespace: kyverno
+data:
+  values.yaml: |
+    # ==============================================================================
+    # GitOps-Only Configuration
+    # ==============================================================================
+    # Pattern: Users can only READ resources, not modify them
+    # All modifications must go through:
+    #   1. Git commits to infrastructure repository
+    #   2. Flux/ArgoCD operators deploy changes automatically
+    #   3. CI/CD deployment jobs for application releases
+    
+    kyverno:
+      # Include all resource management restrictions
+      resourceManagement:
+        
+        # Block Workload Modifications
+        # Users cannot create/update/delete Deployments, StatefulSets, DaemonSets
+        blockWorkloadModifications:
+          enabled: true
+          action: "enforce"
+          severity: "high"
+          
+          message: |
+            ❌ Direct workload modifications are not allowed.
+            
+            ✅ How to deploy:
+            1. Commit your Helm chart to Git repository
+            2. Create/update HelmRelease in Flux or Application in ArgoCD
+            3. For CI/CD: Use deployment-job ServiceAccount
+            
+            📚 Documentation: https://wiki.company.com/gitops
+            🎫 Need help? Open ticket: https://jira.company.com
+          
+          # System namespaces where operators run
+          excludeNamespaces:
+            - kube-system
+            - kube-public
+            - kube-node-lease
+            - flux-system
+            - argocd
+            - ci-cd
+          
+          # Operator ServiceAccounts
+          excludeServiceAccounts:
+            # Flux CD
+            - "system:serviceaccount:flux-system:flux"
+            - "system:serviceaccount:flux-system:helm-controller"
+            - "system:serviceaccount:flux-system:source-controller"
+            
+            # ArgoCD
+            - "system:serviceaccount:argocd:argocd-application-controller"
+            - "system:serviceaccount:argocd:argocd-server"
+            
+            # Custom Helm Operator
+            - "system:serviceaccount:default:helm-operator"
+            - "system:serviceaccount:operators:helm-operator"
+            
+            # CI/CD Deployment Jobs
+            - "system:serviceaccount:ci-cd:deployment-job"
+            - "system:serviceaccount:ci-cd:release-pipeline"
+          
+          # Break-glass users (for emergencies only)
+          excludeUsers:
+            - "cluster-admin"
+            - "break-glass-admin"
+          
+          annotations:
+            compliance.company.com/soc2: "CC6.1,CC6.6"
+            compliance.company.com/iso27001: "A.12.1.2"
+        
+        # Block Networking Modifications
+        # Users cannot create/update/delete Services, Ingresses, NetworkPolicies
+        blockNetworkingModifications:
+          enabled: true
+          action: "enforce"
+          severity: "high"
+          
+          message: |
+            ❌ Direct networking modifications are not allowed.
+            
+            ✅ How to modify networking:
+            1. Update Service/Ingress in Helm chart
+            2. Commit to Git and let Flux/ArgoCD apply
+            3. For NetworkPolicies: Contact platform team
+            
+            📚 Documentation: https://wiki.company.com/networking
+          
+          excludeNamespaces:
+            - kube-system
+            - kube-public
+            - flux-system
+            - argocd
+            - ci-cd
+          
+          excludeServiceAccounts:
+            - "system:serviceaccount:flux-system:flux"
+            - "system:serviceaccount:flux-system:helm-controller"
+            - "system:serviceaccount:argocd:argocd-application-controller"
+            - "system:serviceaccount:default:helm-operator"
+            - "system:serviceaccount:ci-cd:deployment-job"
+          
+          excludeUsers:
+            - "cluster-admin"
+            - "break-glass-admin"
+        
+        # Block Configuration Modifications
+        # Users cannot create/update/delete ConfigMaps, Secrets
+        blockConfigModifications:
+          enabled: true
+          action: "enforce"
+          severity: "medium"
+          
+          message: |
+            ❌ Direct configuration modifications are not allowed.
+            
+            ✅ How to manage configuration:
+            1. ConfigMaps: Include in Helm chart, commit to Git
+            2. Secrets: Use External Secrets Operator + Vault/AWS Secrets Manager
+            3. For CI/CD: Use deployment-job ServiceAccount
+            
+            📚 Secrets documentation: https://wiki.company.com/secrets
+          
+          excludeNamespaces:
+            - kube-system
+            - kube-public
+            - flux-system
+            - argocd
+            - ci-cd
+            - external-secrets
+          
+          excludeServiceAccounts:
+            - "system:serviceaccount:flux-system:flux"
+            - "system:serviceaccount:flux-system:helm-controller"
+            - "system:serviceaccount:argocd:argocd-application-controller"
+            - "system:serviceaccount:default:helm-operator"
+            - "system:serviceaccount:ci-cd:deployment-job"
+            
+            # External Secrets Operator
+            - "system:serviceaccount:external-secrets:external-secrets"
+            - "system:serviceaccount:external-secrets:external-secrets-webhook"
+          
+          excludeUsers:
+            - "cluster-admin"
+            - "break-glass-admin"
+        
+        # Block Storage Modifications
+        # Users cannot create/update/delete PVCs, PVs
+        blockStorageModifications:
+          enabled: true
+          action: "enforce"
+          severity: "high"
+          
+          message: |
+            ❌ Direct storage modifications are not allowed.
+            
+            ✅ How to provision storage:
+            1. Define PVC in Helm chart
+            2. Commit to Git and let Flux/ArgoCD apply
+            3. For special storage needs: Contact platform team
+            
+            📚 Storage documentation: https://wiki.company.com/storage
+          
+          excludeNamespaces:
+            - kube-system
+            - flux-system
+            - argocd
+            - ci-cd
+          
+          excludeServiceAccounts:
+            - "system:serviceaccount:flux-system:flux"
+            - "system:serviceaccount:flux-system:helm-controller"
+            - "system:serviceaccount:argocd:argocd-application-controller"
+            - "system:serviceaccount:default:helm-operator"
+            - "system:serviceaccount:ci-cd:deployment-job"
+          
+          excludeUsers:
+            - "cluster-admin"
+            - "break-glass-admin"
+        
+        # Block RBAC Modifications
+        # Users cannot create/update/delete Roles, RoleBindings
+        blockRBACModifications:
+          enabled: true
+          action: "enforce"
+          severity: "critical"
+          
+          message: |
+            ❌ Direct RBAC modifications are not allowed.
+            
+            ✅ How to request permissions:
+            1. Open ticket: https://jira.company.com/browse/SECURITY
+            2. Security team reviews and approves
+            3. RBAC changes deployed via Flux/ArgoCD
+            
+            🚨 This is a critical security control
+          
+          excludeNamespaces:
+            - kube-system
+            - flux-system
+            - argocd
+          
+          excludeServiceAccounts:
+            - "system:serviceaccount:flux-system:flux"
+            - "system:serviceaccount:flux-system:helm-controller"
+            - "system:serviceaccount:argocd:argocd-application-controller"
+            - "system:serviceaccount:default:helm-operator"
+          
+          excludeUsers:
+            - "cluster-admin"
+            - "admin"
+            - "break-glass-admin"
+
+---
+# ==============================================================================
+# Deployment Instructions
+# ==============================================================================
+# 
+# 1. Install Kyverno:
+#    helm repo add kyverno https://kyverno.github.io/kyverno/
+#    helm install kyverno kyverno/kyverno --namespace kyverno --create-namespace
+# 
+# 2. Install common-kyverno with resource management:
+#    helm install common-kyverno ./charts/common-kyverno \
+#      --namespace kyverno \
+#      -f examples/gitops-only-production.yaml
+# 
+# 3. Verify policies are active:
+#    kubectl get clusterpolicies
+# 
+# 4. Test blocking (should fail):
+#    kubectl create deployment test --image=nginx
+#    # Error: Direct workload modifications are not allowed...
+# 
+# 5. Test operator bypass (should succeed):
+#    # As flux ServiceAccount
+#    kubectl create deployment test --image=nginx \
+#      --as=system:serviceaccount:flux-system:flux
+# 
+# ==============================================================================
+# Break-Glass Procedure (Emergency Access)
+# ==============================================================================
+# 
+# In case of emergency, cluster-admin can bypass policies:
+# 
+# 1. Authenticate as cluster-admin:
+#    kubectl config use-context production-admin
+# 
+# 2. Make emergency changes:
+#    kubectl patch deployment critical-app -p '{"spec":{"replicas":5}}'
+# 
+# 3. Document emergency access:
+#    - Create incident: INC-xxxxx
+#    - Document reason and changes made
+#    - Submit for post-incident review
+# 
+# 4. Ensure changes are reflected in Git:
+#    - Update Helm chart with emergency changes
+#    - Commit to Git
+#    - Deploy via Flux/ArgoCD to maintain consistency
+# 
+# ==============================================================================
+# Monitoring and Auditing
+# ==============================================================================
+# 
+# 1. Monitor policy violations (Prometheus):
+#    kyverno_policy_results_total{policy="block-workload-modifications",result="fail"}
+# 
+# 2. View PolicyReports:
+#    kubectl get policyreports -A
+#    kubectl get policyreport -n production -o yaml
+# 
+# 3. Export audit logs to SIEM:
+#    # FluentD/Fluent Bit configuration
+#    <filter kubernetes.var.log.containers.kyverno-*.log>
+#      @type parser
+#      key_name log
+#      <parse>
+#        @type json
+#      </parse>
+#    </filter>
+# 
+# 4. Grafana dashboard queries:
+#    # Policy violations by user
+#    sum by (user) (
+#      kyverno_policy_results_total{result="fail"}
+#    )
+#    
+#    # Policy violations by namespace
+#    sum by (namespace) (
+#      kyverno_policy_results_total{result="fail"}
+#    )
+# 
+# ==============================================================================
+# Compliance Reporting
+# ==============================================================================
+# 
+# Generate monthly report:
+# 
+# #!/bin/bash
+# START_DATE="2026-02-01"
+# END_DATE="2026-02-28"
+# 
+# echo "=== Resource Management Compliance Report ==="
+# echo "Period: $START_DATE to $END_DATE"
+# echo ""
+# 
+# echo "1. Total policy violations:"
+# kubectl get policyreports -A -o json | \
+#   jq '[.items[].summary.fail] | add'
+# 
+# echo "2. Top violators:"
+# kubectl get policyreports -A -o json | \
+#   jq -r '.items[] | .results[] | 
+#     select(.result == "fail") | 
+#     .resources[].name' | \
+#   sort | uniq -c | sort -rn | head -10
+# 
+# echo "3. Policies with most violations:"
+# kubectl get policyreports -A -o json | \
+#   jq -r '.items[] | .results[] | 
+#     select(.result == "fail") | 
+#     .policy' | \
+#   sort | uniq -c | sort -rn
+# 
+# ==============================================================================
+# Training and Onboarding
+# ==============================================================================
+# 
+# User onboarding checklist:
+# 
+# ✅ 1. Review GitOps workflow documentation
+# ✅ 2. Set up Git repository access (infrastructure repo)
+# ✅ 3. Learn Helm chart structure
+# ✅ 4. Practice in development cluster (audit mode)
+# ✅ 5. Understand break-glass procedure
+# ✅ 6. Complete security training module
+# 
+# Quick reference for users:
+# 
+# ❌ Don't do:
+#   kubectl apply -f deployment.yaml
+#   kubectl create deployment ...
+#   kubectl edit deployment ...
+#   kubectl delete deployment ...
+# 
+# ✅ Do instead:
+#   1. Create/update Helm chart
+#   2. git add charts/myapp/
+#   3. git commit -m "Update myapp deployment"
+#   4. git push origin main
+#   5. Flux/ArgoCD deploys automatically
+# 
+# ==============================================================================
+# Troubleshooting
+# ==============================================================================
+# 
+# Q: Policy blocks legitimate operator?
+# A: Add ServiceAccount to excludeServiceAccounts list
+# 
+# Q: Need emergency access?
+# A: Use cluster-admin credentials (document in incident)
+# 
+# Q: Policy too strict for development?
+# A: Use action: "audit" in dev cluster (log only, don't block)
+# 
+# Q: How to allow specific user to deploy?
+# A: Create deployment-job ServiceAccount, grant to user via RoleBinding
+# 
+# Q: Policy not working?
+# A: Check:
+#    1. Kyverno running: kubectl get pods -n kyverno
+#    2. Policy exists: kubectl get clusterpolicies
+#    3. Webhook configured: kubectl get validatingwebhookconfigurations

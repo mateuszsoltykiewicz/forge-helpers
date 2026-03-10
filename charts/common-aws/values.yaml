@@ -1,0 +1,215 @@
+# ==============================================================================
+# Forge Common Library - AWS Integration Configuration
+# ==============================================================================
+# Configuration for AWS-specific Kubernetes resources.
+#
+# This library provides:
+#   1. ALB Ingress Controller annotations
+#   2. IRSA (IAM Roles for Service Accounts) helpers
+#   3. ECR (Elastic Container Registry) integration
+#   4. EKS-specific configurations
+#
+# Compatible with:
+#   - AWS Load Balancer Controller v2.x
+#   - Amazon EKS 1.23+
+#   - AWS IAM OIDC Provider
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Global AWS Configuration
+# ------------------------------------------------------------------------------
+aws:
+  # AWS account ID (12-digit number)
+  # Required for IRSA and ECR
+  accountId: ""
+
+  # AWS region (e.g., us-east-1, eu-west-1)
+  region: "us-east-1"
+
+  # ------------------------------------------------------------------------------
+  # ALB (Application Load Balancer) Configuration
+  # ------------------------------------------------------------------------------
+  alb:
+    # Enable ALB Ingress Controller annotations
+    enabled: false
+
+    # ALB name (generated using forge.resourceName if not specified)
+    name: ""
+
+    # Scheme: internet-facing or internal
+    scheme: "internet-facing"
+
+    # Target type: ip or instance
+    targetType: "ip"
+
+    # IP address type: ipv4 or dualstack
+    ipAddressType: "ipv4"
+
+    # Subnets for ALB (comma-separated subnet IDs or tags)
+    # Example: subnet-12345,subnet-67890
+    # Or use tags: kubernetes.io/role/elb=1
+    subnets: []
+
+    # Security groups for ALB (comma-separated SG IDs)
+    securityGroups: []
+
+    # Inbound CIDRs (restrict access to specific IP ranges)
+    inboundCidrs: []
+
+    # Health check configuration
+    healthcheck:
+      enabled: true
+      protocol: "HTTP"
+      path: "/health"
+      port: "traffic-port"
+      intervalSeconds: 30
+      timeoutSeconds: 5
+      healthyThresholdCount: 2
+      unhealthyThresholdCount: 2
+      successCodes: "200"
+
+    # SSL/TLS configuration
+    ssl:
+      enabled: false
+      # ACM certificate ARN
+      certificateArn: ""
+      # SSL policy (e.g., ELBSecurityPolicy-TLS-1-2-2017-01)
+      sslPolicy: "ELBSecurityPolicy-TLS13-1-2-2021-06"
+      # Redirect HTTP to HTTPS
+      redirectHttp: true
+      # Listen ports (array of {HTTP: 80}, {HTTPS: 443})
+      listenPorts:
+        - HTTP: 80
+        - HTTPS: 443
+
+    # Authentication configuration (Cognito)
+    auth:
+      cognito:
+        enabled: false
+        # Cognito User Pool ARN
+        userPoolArn: ""
+        # Cognito User Pool Client ID
+        userPoolClientId: ""
+        # Cognito User Pool Domain (e.g., my-app.auth.us-east-1.amazoncognito.com)
+        userPoolDomain: ""
+        # OAuth scopes (e.g., openid, profile, email)
+        scope: "openid"
+        # Session cookie name
+        sessionCookieName: "AWSELBAuthSessionCookie"
+        # Session timeout (seconds)
+        sessionTimeout: 3600
+        # Action on unauthenticated request: authenticate, allow, deny
+        onUnauthenticatedRequest: "authenticate"
+
+      # Generic OIDC authentication
+      oidc:
+        enabled: false
+        # OIDC issuer URL
+        issuer: ""
+        # Client ID
+        clientId: ""
+        # Client secret
+        clientSecret: ""
+        # Authorization endpoint (optional, discovered if not set)
+        authorizationEndpoint: ""
+        # Token endpoint (optional, discovered if not set)
+        tokenEndpoint: ""
+        # User info endpoint (optional, discovered if not set)
+        userInfoEndpoint: ""
+        # OAuth scopes
+        scope: "openid"
+        # Session cookie name
+        sessionCookieName: "AWSELBAuthSessionCookie"
+        # Session timeout (seconds)
+        sessionTimeout: 3600
+        # Action on unauthenticated request
+        onUnauthenticatedRequest: "authenticate"
+
+    # Target group attributes
+    targetGroup:
+      # Enable sticky sessions
+      stickinessEnabled: false
+      # Stickiness duration (seconds)
+      stickinessDurationSeconds: 86400
+      # Deregistration delay (seconds)
+      deregistrationDelaySeconds: 30
+      # Slow start duration (seconds, 0 to disable)
+      slowStartDurationSeconds: 0
+      # Load balancing algorithm: round_robin or least_outstanding_requests
+      loadBalancingAlgorithm: "round_robin"
+
+    # AWS WAF integration
+    waf:
+      enabled: false
+      # WAF WebACL ARN
+      webAclArn: ""
+
+    # AWS Shield Advanced protection
+    shield:
+      enabled: false
+
+    # Access logs to S3
+    accessLogs:
+      enabled: false
+      # S3 bucket name for access logs
+      s3Bucket: ""
+      # S3 prefix (optional)
+      s3Prefix: ""
+
+    # Custom AWS tags for cost allocation
+    tags: {}
+      # Environment: production
+      # Team: platform
+      # CostCenter: engineering
+
+  # ------------------------------------------------------------------------------
+  # IRSA (IAM Roles for Service Accounts) Configuration
+  # ------------------------------------------------------------------------------
+  irsa:
+    # Enable IRSA annotations
+    enabled: false
+
+    # Full IAM role ARN (use this OR roleNamePrefix)
+    roleArn: ""
+
+    # Role name prefix (ARN will be generated: arn:aws:iam::{accountId}:role/{prefix}-{release})
+    roleNamePrefix: ""
+
+    # Token expiration (seconds, default: 86400)
+    tokenExpiration: 86400
+
+    # Audience override (optional, default: sts.amazonaws.com)
+    audienceOverride: ""
+
+    # Use STS regional endpoints (true/false, default: true)
+    stsRegionalEndpoints: true
+
+  # ------------------------------------------------------------------------------
+  # ECR (Elastic Container Registry) Configuration
+  # ------------------------------------------------------------------------------
+  ecr:
+    # ECR repository name
+    repository: ""
+
+    # Custom image pull secret name (generated if not specified)
+    imagePullSecretName: ""
+
+    # ECR Public Gallery alias (for public.ecr.aws)
+    publicAlias: ""
+
+    # Cross-account ECR access
+    sourceAccountId: ""
+    sourceRegion: ""
+
+# ------------------------------------------------------------------------------
+# Common Configuration (inherited from common-forge)
+# ------------------------------------------------------------------------------
+# Override resource names and labels
+nameOverride: ""
+fullnameOverride: ""
+
+# Custom labels for all resources
+labels: {}
+
+# Custom annotations for all resources
+annotations: {}

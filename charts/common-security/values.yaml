@@ -1,0 +1,262 @@
+# ==============================================================================
+# Forge Common Library - Security Configuration
+# ==============================================================================
+# Configuration for Trivy and Falco security tools.
+#
+# This library provides templates for:
+#   - Trivy: Vulnerability and compliance scanning
+#   - Falco: Runtime security monitoring
+#
+# See README.md for usage examples.
+# ==============================================================================
+
+security:
+  # ===========================================================================
+  # Trivy Configuration
+  # ===========================================================================
+  
+  trivy:
+    # Namespace for Trivy resources
+    namespace: "trivy-system"
+    
+    # Vulnerability Report configuration
+    vulnerabilityReport:
+      enabled: false
+      
+      # Severities to report
+      severities:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+      
+      # Ignore unfixed vulnerabilities
+      ignoreUnfixed: true
+      
+      # CVE IDs to ignore
+      ignoreVulnerabilities: []
+      # - CVE-2021-44228
+      
+      # Directories to skip
+      skipDirs: []
+      # - /tmp
+      # - /var
+      
+      # Files to skip
+      skipFiles: []
+      
+      # Scan timeout
+      timeout: "5m"
+      
+      # Offline scan mode
+      offlineScan: false
+      
+      # Additional labels
+      labels: {}
+      
+      # Additional annotations
+      annotations: {}
+    
+    # Configuration Audit Report
+    configAuditReport:
+      enabled: false
+      
+      # Severities to report
+      severities:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+      
+      # Compliance standards
+      compliance: []
+      # - k8s-nsa
+      # - k8s-pss-baseline
+      # - k8s-pss-restricted
+      
+      # Scanners to use
+      scanners: []
+      # - config-audit
+      # - secret
+      # - rbac
+      
+      # Additional labels
+      labels: {}
+    
+    # Secret Scanning
+    secretScan:
+      enabled: false
+      
+      # Secret types to detect
+      secretTypes: []
+      # - aws-access-key-id
+      # - github-token
+      # - private-key
+      
+      # Paths to exclude
+      excludePaths: []
+      # - "**/test/**"
+      # - "**/vendor/**"
+      
+      # Allow rules (false positives)
+      allowRules: []
+      
+      # Additional labels
+      labels: {}
+    
+    # Scheduled Scan Job
+    scanJob:
+      enabled: false
+      
+      # Cron schedule (daily at 2 AM)
+      schedule: "0 2 * * *"
+      
+      # Image to scan
+      imageRef: ""
+      
+      # Trivy scanner image
+      image: "aquasec/trivy:0.48.0"
+      imagePullPolicy: "IfNotPresent"
+      
+      # Severities to report
+      severity:
+        - CRITICAL
+        - HIGH
+      
+      # Ignore unfixed vulnerabilities
+      ignoreUnfixed: true
+      
+      # Service account
+      serviceAccountName: "trivy-operator"
+      
+      # Image pull secrets
+      imagePullSecrets: []
+      
+      # Job history
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+      
+      # Concurrency policy
+      concurrencyPolicy: "Forbid"
+      
+      # Resources
+      resources: {}
+      # limits:
+      #   cpu: 500m
+      #   memory: 512Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+      
+      # Tolerations - allow scheduling on tainted nodes
+      tolerations: []
+      # - key: "security-scanning"
+      #   operator: "Equal"
+      #   value: "true"
+      #   effect: "NoSchedule"
+      # - key: "node-role.kubernetes.io/batch"
+      #   operator: "Exists"
+      #   effect: "NoSchedule"
+      
+      # Node selector - simple key-value node selection
+      nodeSelector: {}
+      # nodeType: "security-scanner"
+      # diskType: "ssd"
+      
+      # Node affinity - advanced node selection rules
+      nodeAffinity: {}
+      # requiredDuringSchedulingIgnoredDuringExecution:
+      #   nodeSelectorTerms:
+      #     - matchExpressions:
+      #         - key: "node-role.kubernetes.io/security"
+      #           operator: In
+      #           values:
+      #             - "scanner"
+      #             - "batch"
+      # preferredDuringSchedulingIgnoredDuringExecution:
+      #   - weight: 100
+      #     preference:
+      #       matchExpressions:
+      #         - key: "diskType"
+      #           operator: In
+      #           values:
+      #             - "ssd"
+      
+      # Pod affinity - co-locate with other pods
+      podAffinity: {}
+      # requiredDuringSchedulingIgnoredDuringExecution:
+      #   - labelSelector:
+      #       matchExpressions:
+      #         - key: "app"
+      #           operator: In
+      #           values:
+      #             - "trivy-operator"
+      #     topologyKey: "kubernetes.io/hostname"
+      
+      # Pod anti-affinity - avoid co-location with other pods
+      podAntiAffinity: {}
+      # preferredDuringSchedulingIgnoredDuringExecution:
+      #   - weight: 100
+      #     podAffinityTerm:
+      #       labelSelector:
+      #         matchExpressions:
+      #           - key: "moai.forge.io/security-tool"
+      #             operator: In
+      #             values:
+      #               - "trivy"
+      #       topologyKey: "kubernetes.io/hostname"
+  
+  # ===========================================================================
+  # Falco Configuration
+  # ===========================================================================
+  
+  falco:
+    # Namespace for Falco resources
+    namespace: "falco"
+    
+    # Custom Falco Rules
+    rules:
+      enabled: false
+      
+      # Raw custom rules (YAML)
+      customRules: ""
+      
+      # Custom macros
+      macros: []
+      # - name: my_macro
+      #   condition: proc.name = "suspicious"
+      
+      # Custom lists
+      lists: []
+      # - name: suspicious_procs
+      #   items:
+      #     - nc
+      #     - ncat
+      
+      # Additional labels
+      labels: {}
+      
+      # Additional annotations
+      annotations: {}
+    
+    # Pre-configured Application Rules
+    applicationRules:
+      enabled: false
+      
+      # Allowed processes
+      allowedProcesses: []
+      # - java
+      # - node
+      # - python
+      
+      # Suspicious IPs to block
+      suspiciousIPs: []
+      # - 10.0.0.1
+      
+      # Alert priority
+      priority: "WARNING"
+    
+    # Pre-configured Compliance Rules
+    complianceRules:
+      enabled: false
+      
+      # Alert priority
+      priority: "WARNING"

@@ -1,0 +1,174 @@
+# ============================================================================
+# Forge Common Library - Vault Integration
+# ============================================================================
+# HashiCorp Vault integration for Kubernetes pods using Vault Agent Injector.
+# Provides secret injection, sections-based organization, and variable verification.
+#
+# Pattern from: video-calling-service
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Vault Configuration
+# ----------------------------------------------------------------------------
+vault:
+  # Enable Vault Agent Injector
+  enabled: false
+  
+  # Vault Kubernetes authentication role
+  # Defaults to forge.fullname if not specified
+  role: "default-role"
+  
+  # Vault service address (optional, uses injector default if not set)
+  # Example: "http://vault.vault.svc.cluster.local:8200"
+  address: "http://vault.default.svc.cluster.local:8200"
+  
+  # Vault namespace (Enterprise feature)
+  namespace: ""
+  
+  # Pre-populate secrets only (don't run sidecar after init)
+  # Set to true for Jobs/CronJobs that don't need continuous secret updates
+  prePopulateOnly: false
+  
+  # Preserve case of secret keys (default: lowercase)
+  preserveSecretCase: false
+  
+  # ----------------------------------------------------------------------------
+  # Vault Agent Configuration
+  # ----------------------------------------------------------------------------
+  agent:
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+  
+  # ----------------------------------------------------------------------------
+  # Vault Agent Init Container Configuration
+  # ----------------------------------------------------------------------------
+  init:
+    # Run init container first (before other init containers)
+    first: true
+    
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+  
+  # ----------------------------------------------------------------------------
+  # Vault Agent Cache Configuration
+  # ----------------------------------------------------------------------------
+  cache:
+    enabled: true
+    useAutoAuthToken: true
+    persist: false
+    persistPath: "/vault/agent-cache"
+    exitOnErr: false
+  
+  # ----------------------------------------------------------------------------
+  # TLS Configuration
+  # ----------------------------------------------------------------------------
+  tls:
+    enabled: false
+    # CA certificate path inside pod
+    caCertPath: "/vault/tls/ca.crt"
+    # Secret name containing CA certificate (defaults to {fullname}-vault-ca-bundle)
+    secretName: "vault-tls"
+    # TLS server name for verification
+    serverName: ""
+    # Skip TLS verification (not recommended for production)
+    skipVerify: false
+  
+  # ----------------------------------------------------------------------------
+  # Authentication Configuration
+  # ----------------------------------------------------------------------------
+  auth:
+    # Authentication method (kubernetes, jwt, aws, etc.)
+    method: "kubernetes"
+    # Authentication path (optional)
+    path: ""
+    # Authentication config (optional)
+    config: ""
+  
+  # ----------------------------------------------------------------------------
+  # Logging Configuration
+  # ----------------------------------------------------------------------------
+  log:
+    # Log level: trace, debug, info, warn, error
+    level: "info"
+    # Log format: standard, json
+    format: "standard"
+  
+  # ----------------------------------------------------------------------------
+  # Security Context
+  # ----------------------------------------------------------------------------
+  # Run Vault Agent as specific user/group
+  runAsUser: ""
+  runAsGroup: ""
+  # Run Vault Agent as same user as application container
+  runAsSameUser: false
+  
+  # ----------------------------------------------------------------------------
+  # Vault Sections (Secret Organization)
+  # ----------------------------------------------------------------------------
+  # Organize secrets into logical sections with automatic template generation
+  # Each section creates a file in /vault/secrets/{section} with export statements
+  #
+  # Format:
+  #   - {section-name}: "{vault-path}"
+  #
+  # Example:
+  sections: []
+    # - app: "secret/data/acme/ecommerce/cart/config"
+    # - database: "secret/data/acme/ecommerce/cart/database"
+    # - external-services: "secret/data/acme/ecommerce/cart/external"
+  #
+  # Generated files:
+  #   /vault/secrets/app
+  #   /vault/secrets/database
+  #   /vault/secrets/external-services
+  #
+  # Each file contains:
+  #   export KEY1="value1"
+  #   export KEY2="value2"
+  #   ...
+  
+  # ----------------------------------------------------------------------------
+  # Variable Verification
+  # ----------------------------------------------------------------------------
+  verification:
+    # Enable environment variable verification after secret injection
+    enabled: false
+    
+    # Verification mode:
+    #   verbose: Show all variables (✓ set, ✗ missing)
+    #   minimal: Only show missing variables
+    #   silent:  No output, just exit code
+    mode: "verbose"
+  
+  # Required environment variables (verification will fail if missing)
+  requiredVars: []
+    # - DB_HOST
+    # - DB_PORT
+    # - DB_NAME
+    # - DB_USER
+    # - DB_PASSWORD
+    # - API_KEY
+  
+  # Optional environment variables (logged but don't fail if missing)
+  optionalVars: []
+    # - DEBUG_MODE
+    # - CACHE_TTL
+    # - LOG_LEVEL
+
+# ----------------------------------------------------------------------------
+# Integration with common-forge
+# ----------------------------------------------------------------------------
+# Inherits from common-forge library:
+#   - forge.fullname (used for default Vault role)
+#   - forge.labels (for TLS secret if created)
+#   - forge.validate.dns1123 (for section name validation)

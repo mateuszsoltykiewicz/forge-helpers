@@ -1,0 +1,146 @@
+# ==============================================================================
+# Forge Common Library - Monitoring Configuration
+# ==============================================================================
+# Configuration for Prometheus and Grafana monitoring resources.
+#
+# This library provides templates for:
+#   - PrometheusRule: Alerting rules
+#   - Grafana Dashboards: Pre-configured dashboards
+#
+# See README.md for usage examples.
+# ==============================================================================
+
+monitoring:
+  # ===========================================================================
+  # PrometheusRule Configuration
+  # ===========================================================================
+  
+  prometheusrule:
+    # Namespace for PrometheusRule resources
+    namespace: "monitoring"
+    
+    # Enable custom PrometheusRule
+    enabled: false
+    
+    # PrometheusRule name (optional, uses forge.resourceName if empty)
+    name: ""
+    
+    # Prometheus instance selector (label)
+    prometheus: ""
+    
+    # Role label
+    role: "alert-rules"
+    
+    # Additional labels
+    labels: {}
+    
+    # Additional annotations
+    annotations: {}
+    
+    # Rule groups
+    groups: []
+    # - name: my-app-alerts
+    #   interval: 30s
+    #   rules:
+    #     - alert: HighErrorRate
+    #       expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    #       for: 5m
+    #       labels:
+    #         severity: critical
+    #       annotations:
+    #         summary: High error rate detected
+    #         description: Error rate is above 5%
+  
+  # ===========================================================================
+  # Pre-configured Alert Rules
+  # ===========================================================================
+  
+  alerts:
+    # Availability alerts
+    availability:
+      enabled: false
+      
+      # Application down threshold
+      downFor: "2m"
+      
+      # Error rate threshold (5%)
+      errorRateThreshold: 0.05
+      errorFor: "5m"
+      errorSeverity: "warning"
+      
+      # Latency threshold (1s for p99)
+      latencyThreshold: 1
+      latencyFor: "5m"
+      latencySeverity: "warning"
+      
+      # Success rate threshold (95%)
+      successRateThreshold: 0.95
+      successFor: "5m"
+    
+    # Resource utilization alerts
+    resources:
+      enabled: false
+      
+      # CPU threshold (80%)
+      cpuThreshold: 0.8
+      cpuFor: "5m"
+      cpuSeverity: "warning"
+      
+      # Memory threshold (80%)
+      memoryThreshold: 0.8
+      memoryFor: "5m"
+      memorySeverity: "warning"
+      
+      # Pod restart rate (0.01/s = ~0.6/min)
+      restartRateThreshold: 0.01
+      restartFor: "5m"
+      
+      # Pod not ready
+      notReadyFor: "5m"
+      
+      # Replica mismatch
+      replicaMismatchFor: "10m"
+    
+    # SLO-based alerts
+    slo:
+      enabled: false
+      
+      # Availability target (99.9%)
+      availabilityTarget: 0.999
+      
+      # Latency target (1s for p99)
+      latencyTarget: 1
+  
+  # ===========================================================================
+  # Grafana Dashboard Configuration
+  # ===========================================================================
+  
+  grafana:
+    # Dashboard namespace
+    dashboard:
+      namespace: "monitoring"
+      
+      # Enable custom dashboard
+      enabled: false
+      
+      # Dashboard name
+      name: ""
+      
+      # Dashboard JSON content
+      json: ""
+      
+      # Additional labels
+      labels: {}
+      
+      # Additional annotations
+      annotations: {}
+    
+    # Pre-configured dashboards
+    dashboards:
+      # Application metrics dashboard (golden signals)
+      application:
+        enabled: false
+      
+      # Infrastructure metrics dashboard (Kubernetes resources)
+      infrastructure:
+        enabled: false

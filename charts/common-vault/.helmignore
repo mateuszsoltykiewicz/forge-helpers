@@ -1,0 +1,35 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# Version control
+.git
+.gitignore
+.svn
+.hg
+.bzr
+
+# macOS
+.DS_Store
+
+# Backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.*.swp
+.*.swo
+
+# IDE files
+.idea
+.vscode
+.project
+.classpath
+.settings
+*.tmproj
+
+# Test files
+*_test.yaml
+test/
+tests/

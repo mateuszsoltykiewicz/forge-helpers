@@ -1,0 +1,81 @@
+# ==============================================================================
+# Forge Common Library - Monitoring
+# ==============================================================================
+# Library chart for Prometheus and Grafana monitoring resources.
+#
+# This library provides reusable Helm templates for observability:
+#   - PrometheusRule: Alerting rules for common scenarios
+#   - ServiceMonitor: Prometheus service discovery
+#   - PodMonitor: Pod-level metrics collection
+#   - Grafana Dashboards: Pre-configured dashboard ConfigMaps
+#
+# Features:
+#   - Pre-configured alerting rules (SLOs, resources, availability)
+#   - Golden signals monitoring (latency, traffic, errors, saturation)
+#   - Kubernetes resource alerts (CPU, memory, disk, network)
+#   - Application health alerts (uptime, response time)
+#   - Grafana dashboard templates (application, infrastructure)
+#   - Multi-severity alerts (info, warning, critical)
+#
+# Integration:
+#   - Integrates with common-forge for naming and labels
+#   - Works with Prometheus Operator (ServiceMonitor, PrometheusRule)
+#   - Compatible with Grafana for dashboard provisioning
+#   - Integrates with common-kubernetes for metrics exposure
+#
+# Requirements:
+#   - Helm 3.0+
+#   - Prometheus Operator (for PrometheusRule, ServiceMonitor)
+#   - Grafana 9.0+ (for dashboards)
+#   - Kubernetes 1.23-1.29
+#
+# Documentation:
+#   - https://prometheus-operator.dev/
+#   - https://grafana.com/docs/grafana/latest/
+# ==============================================================================
+
+apiVersion: v2
+name: common-monitoring
+description: Forge library chart for Prometheus and Grafana monitoring resources
+type: library
+version: 0.1.0
+appVersion: "1.0.0"
+
+# Maintainers
+maintainers:
+  - name: Moai Forge Team
+    email: forge@moai.dev
+
+# Dependencies
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+
+# Keywords for discoverability
+keywords:
+  - prometheus
+  - grafana
+  - monitoring
+  - observability
+  - alerting
+  - metrics
+  - forge
+  - moai
+
+# Annotations
+annotations:
+  # Prometheus Operator version tested
+  moai.forge.io/prometheus-operator-version: "0.70.0"
+  
+  # Grafana version tested
+  moai.forge.io/grafana-version: "10.2.0"
+  
+  # Category for organization
+  moai.forge.io/category: "observability"
+  
+  # Supported features
+  moai.forge.io/features: "prometheusrule,servicemonitor,podmonitor,grafana-dashboards"
+  
+  # Documentation URL
+  moai.forge.io/docs: "https://github.com/moai-forge/forge-helpers/charts/common-monitoring"

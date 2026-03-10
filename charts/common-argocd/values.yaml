@@ -1,0 +1,336 @@
+# ==============================================================================
+# Forge Common Library - ArgoCD Configuration
+# ==============================================================================
+# Configuration for ArgoCD Application and ApplicationSet resources.
+#
+# This library provides templates for:
+#   - Application: Single app deployment from Git
+#   - ApplicationSet: Multi-environment/cluster patterns
+#   - Sync policies: Automated, self-heal, prune
+#   - Generators: List, Git, Cluster, Matrix
+#
+# See README.md for usage examples.
+# ==============================================================================
+
+argocd:
+  # ===========================================================================
+  # Application Configuration
+  # ===========================================================================
+  # Single application deployment from Git repository.
+  
+  application:
+    # Enable Application resource
+    enabled: false
+    
+    # Application name (optional, uses forge.resourceName if empty)
+    name: ""
+    
+    # ArgoCD namespace (where Application resource is created)
+    namespace: "argocd"
+    
+    # ArgoCD project
+    project: "default"
+    
+    # Source configuration
+    source:
+      # Git repository URL (required)
+      repoURL: ""
+      
+      # Target revision (branch, tag, commit SHA)
+      targetRevision: "main"
+      
+      # Path to Helm chart or manifests
+      path: ""
+      
+      # Chart name (for Helm repository)
+      chart: ""
+      
+      # Helm-specific configuration
+      helm:
+        # Helm release name
+        releaseName: ""
+        
+        # Inline values (YAML string)
+        values: ""
+        
+        # Value files from repository
+        valueFiles: []
+        
+        # Helm parameters (key-value overrides)
+        parameters: []
+        # - name: image.tag
+        #   value: "v1.2.3"
+        #   forceString: true
+        
+        # File parameters (from files in repo)
+        fileParameters: []
+        
+        # Helm version (v2 or v3)
+        version: ""
+        
+        # Pass credentials to Helm
+        passCredentials: false
+        
+        # Skip CRD installation
+        skipCrds: false
+      
+      # Kustomize configuration
+      kustomize:
+        namePrefix: ""
+        nameSuffix: ""
+        images: []
+        commonLabels: {}
+        commonAnnotations: {}
+      
+      # Directory configuration
+      directory:
+        recurse: false
+        jsonnet: {}
+    
+    # Destination configuration
+    destination:
+      # Kubernetes API server URL
+      server: "https://kubernetes.default.svc"
+      
+      # Or cluster name (instead of server)
+      name: ""
+      
+      # Target namespace (required)
+      namespace: ""
+    
+    # Sync policy
+    syncPolicy:
+      # Automated sync
+      automated:
+        # Prune resources not in Git
+        prune: false
+        
+        # Self-heal on drift
+        selfHeal: false
+        
+        # Allow empty (delete all resources)
+        allowEmpty: false
+      
+      # Sync options
+      syncOptions: []
+      # - CreateNamespace=true
+      # - PrunePropagationPolicy=foreground
+      # - PruneLast=true
+      # - RespectIgnoreDifferences=true
+      # - ApplyOutOfSyncOnly=true
+      
+      # Retry policy
+      retry:
+        limit: 5
+        backoff:
+          duration: "5s"
+          factor: 2
+          maxDuration: "3m"
+      
+      # Managed namespace metadata
+      managedNamespaceMetadata:
+        labels: {}
+        annotations: {}
+    
+    # Ignore differences (for dynamic fields)
+    ignoreDifferences: []
+    # - group: apps
+    #   kind: Deployment
+    #   jsonPointers:
+    #     - /spec/replicas
+    # - group: ""
+    #   kind: Secret
+    #   name: my-secret
+    #   jqPathExpressions:
+    #     - .data.password
+    
+    # Additional info
+    info: []
+    # - name: "url"
+    #   value: "https://example.com"
+    
+    # Revision history limit
+    revisionHistoryLimit: 10
+    
+    # Finalizers
+    finalizers: []
+    # - resources-finalizer.argocd.argoproj.io
+    
+    # Additional labels
+    labels: {}
+    
+    # Additional annotations
+    annotations: {}
+  
+  # ===========================================================================
+  # ApplicationSet Configuration
+  # ===========================================================================
+  # Multi-environment/cluster deployment with generators.
+  
+  applicationset:
+    # Enable ApplicationSet resource
+    enabled: false
+    
+    # ApplicationSet name (optional, uses forge.resourceName if empty)
+    name: ""
+    
+    # ArgoCD namespace (where ApplicationSet resource is created)
+    namespace: "argocd"
+    
+    # Generators (at least one required)
+    generators:
+      # List Generator: Explicit list of environments
+      list:
+        elements: []
+        # - env: dev
+        #   cluster: https://dev-cluster
+        #   namespace: my-app-dev
+        # - env: staging
+        #   cluster: https://staging-cluster
+        #   namespace: my-app-staging
+        # - env: prod
+        #   cluster: https://prod-cluster
+        #   namespace: my-app-prod
+        template: {}
+      
+      # Git Generator: Discover from Git repository
+      git:
+        repoURL: ""
+        revision: "HEAD"
+        
+        # Directory-based discovery
+        directories: []
+        # - path: environments/*
+        #   exclude: false
+        
+        # File-based discovery
+        files: []
+        # - path: "environments/*/config.json"
+        
+        template: {}
+      
+      # Cluster Generator: Discover from K8s clusters
+      cluster:
+        selector:
+          matchLabels: {}
+          # environment: production
+        values: {}
+        template: {}
+      
+      # Matrix Generator: Combine generators
+      matrix:
+        generators: []
+        # - list:
+        #     elements:
+        #       - env: dev
+        #       - env: prod
+        # - git:
+        #     repoURL: https://github.com/org/repo
+        #     directories:
+        #       - path: apps/*
+        template: {}
+      
+      # Merge Generator: Merge parameters
+      merge:
+        mergeKeys: []
+        # - server
+        generators: []
+        template: {}
+      
+      # Pull Request Generator: Create apps for PRs
+      pullRequest:
+        github: {}
+        # owner: myorg
+        # repo: myrepo
+        gitlab: {}
+        gitea: {}
+        bitbucket: {}
+        template: {}
+      
+      # SCM Provider Generator: Discover repositories
+      scmProvider:
+        github: {}
+        # organization: myorg
+        gitlab: {}
+        gitea: {}
+        bitbucket: {}
+        template: {}
+      
+      # Custom generators
+      custom: []
+    
+    # Application template (used by generators)
+    template:
+      metadata:
+        # Template name (can use generator variables like '{{env}}-myapp')
+        name: ""
+        namespace: ""
+        labels: {}
+        annotations: {}
+        finalizers: []
+      
+      spec:
+        # Project
+        project: "default"
+        
+        # Source
+        source:
+          repoURL: ""
+          targetRevision: "HEAD"
+          path: ""
+          chart: ""
+          helm: {}
+          kustomize: {}
+          directory: {}
+        
+        # Destination
+        destination:
+          server: ""
+          name: ""
+          namespace: ""
+        
+        # Sync policy
+        syncPolicy: {}
+        
+        # Ignore differences
+        ignoreDifferences: []
+        
+        # Additional info
+        info: []
+        
+        # Revision history limit
+        revisionHistoryLimit: 10
+    
+    # ApplicationSet sync policy
+    syncPolicy:
+      # Preserve Applications when ApplicationSet is deleted
+      preserveResourcesOnDeletion: false
+      
+      # Sync policy for generated Applications
+      applicationsSync: "sync"  # sync, create-only, create-update, create-delete
+    
+    # Progressive rollout strategy
+    strategy: {}
+    # type: RollingSync
+    # rollingSync:
+    #   steps:
+    #     - matchExpressions:
+    #         - key: env
+    #           operator: In
+    #           values: [dev]
+    #     - matchExpressions:
+    #         - key: env
+    #           operator: In
+    #           values: [staging]
+    #       maxUpdate: 2
+    #     - matchExpressions:
+    #         - key: env
+    #           operator: In
+    #           values: [prod]
+    #       maxUpdate: 1
+    
+    # Additional labels
+    labels: {}
+    
+    # Additional annotations
+    annotations: {}

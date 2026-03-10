@@ -1,0 +1,963 @@
+# ==============================================================================
+# Forge Common Library - Default Values
+# ==============================================================================
+# This values file serves as a schema and reference for all configurable
+# parameters in the common-library chart. Application charts using this
+# library should override these values as needed.
+#
+# Sections:
+#   1. Global Settings
+#   2. Forge Naming Pattern
+#   3. Workload Configuration
+#   4. Image Configuration
+#   5. Service Account
+#   6. Pod Configuration
+#   7. Container Configuration
+#   8. Resource Management
+#   9. Health Probes
+#  10. Service Configuration
+#  11. Ingress Configuration
+#  12. Network Policy
+#  13. Autoscaling
+#  14. Pod Disruption Budget
+#  15. Storage (PVC)
+#  16. RBAC
+#  17. Job/CronJob Configuration
+#  18. Monitoring & Observability
+# ==============================================================================
+
+# ==============================================================================
+# 1. GLOBAL SETTINGS
+# ==============================================================================
+global:
+  # Global settings that can be shared across multiple charts
+  
+  # Default image registry for all images
+  imageRegistry: ""
+  
+  # Global image pull secrets
+  imagePullSecrets: []
+  # - name: registry-credentials
+  
+  # Global labels applied to all resources
+  labels: {}
+    # team: platform
+    # environment: production
+  
+  # Global annotations applied to all resources
+  annotations: {}
+  
+  # StorageClass to use for all PVCs
+  storageClass: ""
+  
+  # Default timezone
+  timezone: "UTC"
+
+# ==============================================================================
+# 2. FORGE NAMING PATTERN
+# ==============================================================================
+# Forge standardized naming: {customer}-{project}-{environment}-{service}
+# These override the default Helm naming if provided
+forgeNaming:
+  # Enable Forge naming pattern (if false, uses standard Helm naming)
+  enabled: true
+  
+  # Customer identifier (e.g., "acme", "contoso")
+  customer: ""
+  
+  # Project name (e.g., "ecommerce", "analytics")
+  project: ""
+  
+  # Environment (e.g., "dev", "staging", "prod")
+  environment: ""
+  
+  # Service name (e.g., "api", "frontend", "worker")
+  service: ""
+  
+  # Separator between components (default: "-")
+  separator: "-"
+  
+  # Maximum length for generated names (Kubernetes limit: 63, Helm release: 53)
+  maxLength: 53
+
+# ==============================================================================
+# 3. WORKLOAD CONFIGURATION
+# ==============================================================================
+workload:
+  # Type of workload to deploy
+  # Options: deployment, statefulset, daemonset, job, cronjob, none
+  type: deployment
+  
+  # Number of replicas (for Deployment/StatefulSet)
+  replicaCount: 1
+  
+  # Revision history limit
+  revisionHistoryLimit: 10
+  
+  # Strategy for Deployment
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Update strategy for StatefulSet
+  statefulSetUpdateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  
+  # Update strategy for DaemonSet
+  daemonSetUpdateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  
+  # Pod Management Policy for StatefulSet (OrderedReady or Parallel)
+  podManagementPolicy: OrderedReady
+  
+  # ServiceName for StatefulSet (creates headless service)
+  serviceName: ""
+  
+  # Min ready seconds
+  minReadySeconds: 0
+
+# ==============================================================================
+# 4. IMAGE CONFIGURATION
+# ==============================================================================
+image:
+  # Image registry (overrides global.imageRegistry)
+  registry: ""
+  
+  # Image repository (e.g., "nginx", "my-org/my-app")
+  repository: nginx
+  
+  # Image tag (defaults to Chart.AppVersion if not set)
+  tag: ""
+  
+  # Image pull policy
+  # Options: Always, IfNotPresent, Never
+  pullPolicy: IfNotPresent
+  
+  # Image pull secrets (merged with global.imagePullSecrets)
+  pullSecrets: []
+  # - name: registry-credentials
+  
+  # Digest-based image reference (overrides tag if set)
+  digest: ""
+
+# ==============================================================================
+# 5. SERVICE ACCOUNT
+# ==============================================================================
+serviceAccount:
+  # Create a ServiceAccount
+  create: true
+  
+  # Annotations for ServiceAccount
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
+  
+  # Name of ServiceAccount (generated if not set)
+  name: ""
+  
+  # Auto-mount service account token
+  automountServiceAccountToken: true
+  
+  # Additional labels
+  labels: {}
+
+# ==============================================================================
+# 6. POD CONFIGURATION
+# ==============================================================================
+pod:
+  # Pod annotations
+  annotations: {}
+    # prometheus.io/scrape: "true"
+    # prometheus.io/port: "8080"
+    # prometheus.io/path: "/metrics"
+  
+  # Pod labels (merged with selector labels)
+  labels: {}
+  
+  # Security context for pod
+  securityContext:
+    runAsNonRoot: false
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+    fsGroupChangePolicy: null
+    supplementalGroups: []
+    sysctls: []
+    seccompProfile: null
+      # type: RuntimeDefault
+  
+  # Termination grace period
+  terminationGracePeriodSeconds: 30
+  
+  # DNS policy
+  # Options: ClusterFirst, ClusterFirstWithHostNet, Default, None
+  dnsPolicy: ClusterFirst
+  
+  # DNS config
+  dnsConfig: {}
+    # nameservers:
+    #   - 1.1.1.1
+    # searches:
+    #   - ns1.svc.cluster-domain.example
+    # options:
+    #   - name: ndots
+    #     value: "2"
+  
+  # Host network
+  hostNetwork: false
+  
+  # Host PID
+  hostPID: false
+  
+  # Host IPC
+  hostIPC: false
+  
+  # Share process namespace
+  shareProcessNamespace: false
+  
+  # Priority class name
+  priorityClassName: ""
+  
+  # Restart policy (Always, OnFailure, Never)
+  restartPolicy: Always
+  
+  # Active deadline seconds (for Jobs)
+  activeDeadlineSeconds: null
+  
+  # Init containers
+  initContainers: []
+  # - name: init-myservice
+  #   image: busybox:1.28
+  #   command: ['sh', '-c', 'until nslookup myservice; do echo waiting; sleep 2; done']
+  
+  # Sidecar containers
+  sidecarContainers: []
+  # - name: sidecar
+  #   image: sidecar:latest
+  #   ports:
+  #     - containerPort: 9090
+
+# ==============================================================================
+# 7. CONTAINER CONFIGURATION
+# ==============================================================================
+container:
+  # Container name (defaults to Chart name if not set)
+  name: ""
+  
+  # Command (overrides ENTRYPOINT)
+  command: []
+  # - /bin/sh
+  
+  # Args (overrides CMD)
+  args: []
+  # - -c
+  # - echo hello
+  
+  # Working directory
+  workingDir: ""
+  
+  # Container ports
+  ports:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+  
+  # Environment variables (simple key-value)
+  env: []
+  # - name: ENV_VAR
+  #   value: "value"
+  
+  # Environment variables from ConfigMap
+  envFrom: []
+  # - configMapRef:
+  #     name: my-config
+  # - secretRef:
+  #     name: my-secret
+  
+  # Security context for container
+  securityContext:
+    allowPrivilegeEscalation: false
+    privileged: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    runAsUser: null
+    runAsGroup: null
+    capabilities:
+      drop: []
+      # - ALL
+      add: []
+      # - NET_BIND_SERVICE
+    seccompProfile: null
+      # type: RuntimeDefault
+    seLinuxOptions: null
+    windowsOptions: null
+  
+  # Volume mounts
+  volumeMounts: []
+  # - name: data
+  #   mountPath: /data
+  #   readOnly: false
+  
+  # Lifecycle hooks
+  lifecycle: {}
+    # postStart:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "echo Hello"]
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  
+  # Stdin
+  stdin: false
+  stdinOnce: false
+  
+  # TTY
+  tty: false
+
+# ==============================================================================
+# 8. RESOURCE MANAGEMENT
+# ==============================================================================
+resources:
+  # Resource limits
+  limits:
+    cpu: null
+    memory: null
+    ephemeral-storage: null
+  
+  # Resource requests
+  requests:
+    cpu: null
+    memory: null
+    ephemeral-storage: null
+
+# Resource quotas (for namespace-level quotas)
+resourceQuota:
+  enabled: false
+  limits:
+    cpu: "10"
+    memory: "20Gi"
+    pods: "10"
+  requests:
+    cpu: "5"
+    memory: "10Gi"
+
+# Limit ranges (for namespace-level defaults)
+limitRange:
+  enabled: false
+  limits:
+    - type: Container
+      max:
+        cpu: "2"
+        memory: "2Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+      default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+
+# ==============================================================================
+# 9. HEALTH PROBES
+# ==============================================================================
+livenessProbe:
+  enabled: true
+  
+  # Probe type: httpGet, tcpSocket, exec, grpc
+  type: httpGet
+  
+  # HTTP probe settings
+  httpGet:
+    path: /healthz
+    port: http
+    scheme: HTTP
+    httpHeaders: []
+    # - name: Custom-Header
+    #   value: value
+  
+  # TCP probe settings
+  tcpSocket:
+    port: http
+  
+  # Exec probe settings
+  exec:
+    command: []
+    # - cat
+    # - /tmp/healthy
+  
+  # gRPC probe settings (Kubernetes 1.24+)
+  grpc:
+    port: 9090
+    service: null
+  
+  # Probe timing
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  
+  # Probe type: httpGet, tcpSocket, exec, grpc
+  type: httpGet
+  
+  # HTTP probe settings
+  httpGet:
+    path: /ready
+    port: http
+    scheme: HTTP
+    httpHeaders: []
+  
+  # TCP probe settings
+  tcpSocket:
+    port: http
+  
+  # Exec probe settings
+  exec:
+    command: []
+  
+  # gRPC probe settings (Kubernetes 1.24+)
+  grpc:
+    port: 9090
+    service: null
+  
+  # Probe timing
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 3
+
+startupProbe:
+  enabled: false
+  
+  # Probe type: httpGet, tcpSocket, exec, grpc
+  type: httpGet
+  
+  # HTTP probe settings
+  httpGet:
+    path: /startup
+    port: http
+    scheme: HTTP
+    httpHeaders: []
+  
+  # TCP probe settings
+  tcpSocket:
+    port: http
+  
+  # Exec probe settings
+  exec:
+    command: []
+  
+  # gRPC probe settings (Kubernetes 1.24+)
+  grpc:
+    port: 9090
+    service: null
+  
+  # Probe timing
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 30
+
+# ==============================================================================
+# 10. SERVICE CONFIGURATION
+# ==============================================================================
+service:
+  # Enable Service creation
+  enabled: true
+  
+  # Service type
+  # Options: ClusterIP, NodePort, LoadBalancer, ExternalName
+  type: ClusterIP
+  
+  # Service annotations
+  annotations: {}
+    # service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  
+  # Service labels
+  labels: {}
+  
+  # ClusterIP (can be "None" for headless service)
+  clusterIP: ""
+  
+  # External IPs
+  externalIPs: []
+  
+  # Load balancer IP (for LoadBalancer type)
+  loadBalancerIP: ""
+  
+  # Load balancer source ranges
+  loadBalancerSourceRanges: []
+  
+  # External traffic policy (Local or Cluster)
+  externalTrafficPolicy: null
+  
+  # Session affinity (None or ClientIP)
+  sessionAffinity: None
+  
+  # Session affinity config
+  sessionAffinityConfig: {}
+    # clientIP:
+    #   timeoutSeconds: 10800
+  
+  # Service ports
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+      nodePort: null
+  
+  # Publish not ready addresses (for StatefulSet)
+  publishNotReadyAddresses: false
+
+# Additional services (for multi-port applications)
+additionalServices: []
+# - name: metrics
+#   type: ClusterIP
+#   ports:
+#     - name: metrics
+#       port: 9090
+#       targetPort: metrics
+#       protocol: TCP
+
+# ==============================================================================
+# 11. INGRESS CONFIGURATION
+# ==============================================================================
+ingress:
+  # Enable Ingress
+  enabled: false
+  
+  # Ingress class name (e.g., nginx, traefik, alb)
+  className: ""
+  
+  # Ingress annotations
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+  
+  # Ingress labels
+  labels: {}
+  
+  # Ingress hosts
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          # Service backend (defaults to main service)
+          serviceName: null
+          servicePort: null
+  
+  # TLS configuration
+  tls: []
+  # - secretName: chart-example-tls
+  #   hosts:
+  #     - chart-example.local
+
+# Additional Ingresses
+additionalIngresses: []
+# - name: admin
+#   className: nginx
+#   hosts:
+#     - host: admin.example.local
+#       paths:
+#         - path: /
+#           pathType: Prefix
+
+# ==============================================================================
+# 12. NETWORK POLICY
+# ==============================================================================
+networkPolicy:
+  # Enable NetworkPolicy
+  enabled: false
+  
+  # Pod selector (defaults to app selector labels)
+  podSelector: {}
+  
+  # Policy types
+  policyTypes:
+    - Ingress
+    # - Egress
+  
+  # Ingress rules
+  ingress: []
+  # - from:
+  #     - podSelector:
+  #         matchLabels:
+  #           app: allowed-app
+  #     - namespaceSelector:
+  #         matchLabels:
+  #           name: allowed-namespace
+  #   ports:
+  #     - protocol: TCP
+  #       port: 8080
+  
+  # Egress rules
+  egress: []
+  # - to:
+  #     - podSelector:
+  #         matchLabels:
+  #           app: database
+  #   ports:
+  #     - protocol: TCP
+  #       port: 5432
+
+# ==============================================================================
+# 13. AUTOSCALING
+# ==============================================================================
+autoscaling:
+  # Enable HorizontalPodAutoscaler
+  enabled: false
+  
+  # API version (v1, v2beta2, v2)
+  apiVersion: v2
+  
+  # Min replicas
+  minReplicas: 1
+  
+  # Max replicas
+  maxReplicas: 10
+  
+  # Target CPU utilization percentage
+  targetCPUUtilizationPercentage: 80
+  
+  # Target memory utilization percentage
+  targetMemoryUtilizationPercentage: null
+  
+  # Custom metrics
+  metrics: []
+  # - type: Pods
+  #   pods:
+  #     metric:
+  #       name: custom_metric
+  #     target:
+  #       type: AverageValue
+  #       averageValue: "1000"
+  
+  # Behavior (v2beta2+)
+  behavior: {}
+    # scaleDown:
+    #   stabilizationWindowSeconds: 300
+    #   policies:
+    #     - type: Percent
+    #       value: 50
+    #       periodSeconds: 15
+    # scaleUp:
+    #   stabilizationWindowSeconds: 0
+    #   policies:
+    #     - type: Percent
+    #       value: 100
+    #       periodSeconds: 15
+
+# Vertical Pod Autoscaler (requires VPA operator)
+verticalPodAutoscaler:
+  enabled: false
+  updateMode: "Auto"  # Auto, Initial, Recreate, Off
+  resourcePolicy: {}
+
+# ==============================================================================
+# 14. POD DISRUPTION BUDGET
+# ==============================================================================
+podDisruptionBudget:
+  # Enable PodDisruptionBudget
+  enabled: false
+  
+  # Min available (number or percentage)
+  minAvailable: 1
+  
+  # Max unavailable (number or percentage, mutually exclusive with minAvailable)
+  maxUnavailable: null
+  
+  # Unhealthy pod eviction policy (Kubernetes 1.26+)
+  unhealthyPodEvictionPolicy: null  # IfHealthyBudget, AlwaysAllow
+
+# ==============================================================================
+# 15. STORAGE (PVC)
+# ==============================================================================
+persistence:
+  # Enable persistence
+  enabled: false
+  
+  # Storage class name
+  storageClass: ""
+  
+  # Access modes
+  accessModes:
+    - ReadWriteOnce
+  
+  # Size
+  size: 1Gi
+  
+  # Annotations
+  annotations: {}
+  
+  # Labels
+  labels: {}
+  
+  # Selector for existing PV
+  selector: {}
+  # matchLabels:
+  #   app: my-app
+  
+  # Data source (for cloning)
+  dataSource: null
+  # kind: PersistentVolumeClaim
+  # name: source-pvc
+  
+  # Mount path
+  mountPath: /data
+  
+  # Sub path
+  subPath: ""
+  
+  # Existing claim name (if not creating new PVC)
+  existingClaim: ""
+  
+  # Retain PVC on delete
+  retain: false
+
+# Additional PVCs
+additionalPVCs: []
+# - name: logs
+#   storageClass: ""
+#   accessModes:
+#     - ReadWriteOnce
+#   size: 5Gi
+#   mountPath: /var/log
+
+# Volumes (non-PVC volumes)
+volumes: []
+# - name: config
+#   configMap:
+#     name: my-config
+# - name: secret
+#   secret:
+#     secretName: my-secret
+# - name: emptydir
+#   emptyDir: {}
+
+# ==============================================================================
+# 16. RBAC
+# ==============================================================================
+rbac:
+  # Create RBAC resources
+  create: false
+  
+  # Role rules
+  rules: []
+  # - apiGroups: [""]
+  #   resources: ["pods"]
+  #   verbs: ["get", "list", "watch"]
+  
+  # Use ClusterRole instead of Role
+  clusterRole: false
+  
+  # Additional Role/ClusterRole names to bind
+  additionalRoles: []
+  # - name: view
+  #   kind: ClusterRole
+
+# ==============================================================================
+# 17. JOB/CRONJOB CONFIGURATION
+# ==============================================================================
+job:
+  # Job-specific settings (when workload.type = job)
+  
+  # Completions
+  completions: 1
+  
+  # Parallelism
+  parallelism: 1
+  
+  # Backoff limit
+  backoffLimit: 6
+  
+  # Active deadline seconds
+  activeDeadlineSeconds: null
+  
+  # TTL seconds after finished
+  ttlSecondsAfterFinished: null
+  
+  # Completion mode (NonIndexed or Indexed)
+  completionMode: NonIndexed
+
+cronJob:
+  # CronJob-specific settings (when workload.type = cronjob)
+  
+  # Schedule (cron format)
+  schedule: "0 0 * * *"
+  
+  # Timezone (Kubernetes 1.25+)
+  timeZone: null
+  
+  # Concurrency policy (Allow, Forbid, Replace)
+  concurrencyPolicy: Allow
+  
+  # Suspend
+  suspend: false
+  
+  # Successful jobs history limit
+  successfulJobsHistoryLimit: 3
+  
+  # Failed jobs history limit
+  failedJobsHistoryLimit: 1
+  
+  # Starting deadline seconds
+  startingDeadlineSeconds: null
+
+# ==============================================================================
+# 18. MONITORING & OBSERVABILITY
+# ==============================================================================
+monitoring:
+  # Service Monitor (Prometheus Operator)
+  serviceMonitor:
+    enabled: false
+    namespace: null
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    honorLabels: false
+    relabelings: []
+    metricRelabelings: []
+    targetLabels: []
+    endpoints:
+      - port: http
+        path: /metrics
+  
+  # Pod Monitor (Prometheus Operator)
+  podMonitor:
+    enabled: false
+    namespace: null
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    honorLabels: false
+    relabelings: []
+    metricRelabelings: []
+    podMetricsEndpoints:
+      - port: http
+        path: /metrics
+
+# Logging
+logging:
+  # Log level (if supported by application)
+  level: info
+  
+  # Log format (json, text)
+  format: json
+
+# Tracing (OpenTelemetry)
+tracing:
+  enabled: false
+  endpoint: ""
+  samplingRate: 0.1
+
+# ==============================================================================
+# ADVANCED CONFIGURATION
+# ==============================================================================
+
+# Node selector
+nodeSelector: {}
+# kubernetes.io/os: linux
+# node.kubernetes.io/instance-type: m5.large
+
+# Tolerations
+tolerations: []
+# - key: "key1"
+#   operator: "Equal"
+#   value: "value1"
+#   effect: "NoSchedule"
+
+# Affinity rules
+affinity: {}
+# podAntiAffinity:
+#   preferredDuringSchedulingIgnoredDuringExecution:
+#     - weight: 100
+#       podAffinityTerm:
+#         labelSelector:
+#           matchExpressions:
+#             - key: app
+#               operator: In
+#               values:
+#                 - my-app
+#         topologyKey: kubernetes.io/hostname
+
+# Topology spread constraints
+topologySpreadConstraints: []
+# - maxSkew: 1
+#   topologyKey: topology.kubernetes.io/zone
+#   whenUnsatisfiable: DoNotSchedule
+#   labelSelector:
+#     matchLabels:
+#       app: my-app
+
+# Pod overhead (for virtualized runtimes)
+overhead: {}
+
+# Runtime class name
+runtimeClassName: null
+
+# Preemption policy
+preemptionPolicy: null
+
+# ==============================================================================
+# ADDITIONAL RESOURCES
+# ==============================================================================
+
+# ConfigMaps to create
+configMaps: []
+# - name: app-config
+#   data:
+#     config.yaml: |
+#       key: value
+
+# Secrets to create (not recommended - use external secret management)
+secrets: []
+# - name: app-secret
+#   type: Opaque
+#   data:
+#     password: cGFzc3dvcmQ=  # base64 encoded
+
+# Additional manifests (raw Kubernetes YAML)
+extraManifests: []
+# - apiVersion: v1
+#   kind: ConfigMap
+#   metadata:
+#     name: extra-config
+#   data:
+#     key: value
+
+# ==============================================================================
+# TESTING
+# ==============================================================================
+tests:
+  # Enable test pods
+  enabled: false
+  
+  # Test image
+  image:
+    repository: busybox
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Test command
+  command:
+    - wget
+  
+  # Test args
+  args:
+    - -O-
+    - http://{{ include "common-library.fullname" . }}:{{ .Values.service.ports[0].port }}/

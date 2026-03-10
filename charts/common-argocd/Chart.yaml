@@ -1,0 +1,78 @@
+# ==============================================================================
+# Forge Common Library - ArgoCD
+# ==============================================================================
+# Library chart for ArgoCD GitOps resources.
+#
+# This library provides reusable Helm templates for ArgoCD Application and
+# ApplicationSet resources, enabling declarative GitOps workflows and
+# multi-environment/cluster deployments.
+#
+# Features:
+#   - Application template for single app deployment
+#   - ApplicationSet template for multi-environment/cluster patterns
+#   - Sync policies (automated, self-heal, prune)
+#   - Sync waves and hooks for ordering
+#   - Helm parameter overrides
+#   - Ignore differences for dynamic fields
+#   - Multiple generator types (List, Git, Cluster, Matrix)
+#   - Progressive rollout strategies
+#
+# Integration:
+#   - Integrates with common-forge for naming and labels
+#   - Integrates with common-kubernetes for destination namespaces
+#   - Works with any Git repository structure
+#   - Compatible with multi-cluster ArgoCD setups
+#
+# Requirements:
+#   - Helm 3.0+
+#   - ArgoCD 2.8+ installed in cluster
+#   - Kubernetes 1.23-1.29
+#
+# Documentation:
+#   - https://argo-cd.readthedocs.io/
+#   - https://argo-cd.readthedocs.io/en/stable/user-guide/application-set/
+# ==============================================================================
+
+apiVersion: v2
+name: common-argocd
+description: Forge library chart for ArgoCD GitOps resources
+type: library
+version: 0.1.0
+appVersion: "2.10.0"
+
+# Maintainers
+maintainers:
+  - name: Moai Forge Team
+    email: forge@moai.dev
+
+# Dependencies
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+  - name: common-kubernetes
+    version: ~0.1.0
+    repository: file://../common-kubernetes
+
+# Keywords for discoverability
+keywords:
+  - argocd
+  - gitops
+  - continuous-deployment
+  - kubernetes
+  - forge
+  - moai
+
+# Annotations
+annotations:
+  # ArgoCD version tested
+  moai.forge.io/argocd-version: "2.10.0"
+  
+  # Category for organization
+  moai.forge.io/category: "gitops"
+  
+  # Supported features
+  moai.forge.io/features: "application,applicationset,sync-policies,generators"
+  
+  # Documentation URL
+  moai.forge.io/docs: "https://github.com/moai-forge/forge-helpers/charts/common-argocd"

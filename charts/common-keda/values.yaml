@@ -1,0 +1,294 @@
+# ==============================================================================
+# Forge Common Library - KEDA Configuration
+# ==============================================================================
+# Configuration for KEDA (Kubernetes Event-Driven Autoscaling).
+#
+# This library provides:
+#   1. ScaledObject - event-driven autoscaling (replaces HPA)
+#   2. ScaledJob - event-driven batch processing (creates Jobs)
+#   3. TriggerAuthentication - Vault-backed secrets for triggers
+#   4. 60+ trigger types (Prometheus, RabbitMQ, AWS, Kafka, databases, etc.)
+#
+# Compatible with:
+#   - KEDA 2.10+ (tested with 2.13.0)
+#   - Kubernetes 1.23-1.29
+#   - HashiCorp Vault (optional, via common-vault)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# KEDA ScaledObject Configuration
+# ------------------------------------------------------------------------------
+keda:
+  scaledobject:
+    # Enable ScaledObject
+    enabled: false
+
+    # Resource name override
+    name: ""
+
+    # Target workload to scale (Deployment, StatefulSet)
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: my-app
+
+    # Polling interval (seconds) - how often KEDA checks metrics
+    pollingInterval: 30
+
+    # Cooldown period (seconds) - wait after scaling down before next scale down
+    cooldownPeriod: 300
+
+    # Idle replica count (set to 0 to scale to zero, requires special workload support)
+    # idleReplicaCount: 0
+
+    # Min/max replica counts
+    minReplicaCount: 1
+    maxReplicaCount: 10
+
+    # Advanced scaling configuration
+    advanced:
+      # Horizontal pod autoscaler config
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+              - type: Percent
+                value: 50
+                periodSeconds: 60
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Percent
+                value: 100
+                periodSeconds: 30
+              - type: Pods
+                value: 2
+                periodSeconds: 30
+            selectPolicy: Max
+
+      # Restore to original replica count after ScaledObject deletion
+      restoreToOriginalReplicaCount: false
+
+    # Fallback configuration (when scalers fail)
+    fallback:
+      failureThreshold: 3
+      replicas: 2
+
+    # Triggers (array of scaling triggers)
+    triggers: []
+      # Example: Prometheus
+      # - type: prometheus
+      #   metadata:
+      #     serverAddress: http://prometheus:9090
+      #     query: sum(rate(http_requests_total[5m]))
+      #     threshold: "100"
+      #     activationThreshold: "50"
+      #   authenticationRef:
+      #     name: prometheus-trigger-auth
+
+      # Example: RabbitMQ
+      # - type: rabbitmq
+      #   metadata:
+      #     host: amqp://rabbitmq:5672
+      #     queueName: my-queue
+      #     queueLength: "10"
+      #   authenticationRef:
+      #     name: rabbitmq-trigger-auth
+
+      # Example: AWS SQS
+      # - type: aws-sqs-queue
+      #   metadata:
+      #     queueURL: https://sqs.us-east-1.amazonaws.com/123456789012/my-queue
+      #     queueLength: "5"
+      #     awsRegion: us-east-1
+      #   authenticationRef:
+      #     name: aws-trigger-auth
+
+      # Example: Kafka
+      # - type: kafka
+      #   metadata:
+      #     bootstrapServers: kafka:9092
+      #     consumerGroup: my-consumer-group
+      #     topic: my-topic
+      #     lagThreshold: "10"
+
+      # Example: Redis
+      # - type: redis
+      #   metadata:
+      #     address: redis:6379
+      #     listName: my-list
+      #     listLength: "5"
+
+      # Example: Cron (time-based scaling)
+      # - type: cron
+      #   metadata:
+      #     timezone: America/New_York
+      #     start: "0 8 * * 1-5"  # 8am weekdays
+      #     end: "0 18 * * 1-5"   # 6pm weekdays
+      #     desiredReplicas: "5"
+
+      # Example: PostgreSQL
+      # - type: postgresql
+      #   metadata:
+      #     query: "SELECT COUNT(*) FROM pending_tasks WHERE status = 'pending'"
+      #     targetQueryValue: "10"
+      #   authenticationRef:
+      #     name: postgres-trigger-auth
+
+    # Custom labels for ScaledObject
+    labels: {}
+
+    # Custom annotations for ScaledObject
+    annotations: {}
+
+  # ------------------------------------------------------------------------------
+  # KEDA ScaledJob Configuration
+  # ------------------------------------------------------------------------------
+  scaledjob:
+    # Enable ScaledJob
+    enabled: false
+
+    # Resource name override
+    name: ""
+
+    # Job template (Kubernetes Job spec)
+    jobTargetRef:
+      template:
+        metadata:
+          labels:
+            app: my-batch-job
+        spec:
+          containers:
+            - name: processor
+              image: my-app:latest
+              command: ["python", "process_messages.py"]
+          restartPolicy: OnFailure
+
+    # Polling interval (seconds)
+    pollingInterval: 30
+
+    # Job history limits
+    successfulJobsHistoryLimit: 5
+    failedJobsHistoryLimit: 5
+
+    # Max concurrent jobs
+    maxReplicaCount: 10
+
+    # Scaling strategy
+    scalingStrategy:
+      strategy: "default"  # default, custom, accurate
+      # customScalingQueueLengthDeduction: 10
+      # customScalingRunningJobPercentage: "0.5"
+
+    # Rollout strategy (gradual, immediate)
+    # rolloutStrategy: gradual
+
+    # Triggers (same format as ScaledObject)
+    triggers: []
+
+    # Custom labels for ScaledJob
+    labels: {}
+
+    # Custom annotations for ScaledJob
+    annotations: {}
+
+    # ------------------------------------------------------------------------------
+    # Pre-configured batch processing patterns
+    # ------------------------------------------------------------------------------
+    
+    # RabbitMQ batch processing
+    rabbitmq:
+      enabled: false
+      host: "amqp://rabbitmq:5672"
+      queueName: "my-queue"
+      messagesPerJob: 10  # Each job processes 10 messages
+      pollingInterval: 30
+      maxReplicaCount: 10
+      scalingStrategy: "accurate"
+      authenticationRef:
+        name: rabbitmq-trigger-auth
+
+    # AWS SQS batch processing
+    sqs:
+      enabled: false
+      queueURL: ""
+      awsRegion: "us-east-1"
+      messagesPerJob: 10
+      pollingInterval: 30
+      maxReplicaCount: 10
+      scalingStrategy: "accurate"
+      authenticationRef:
+        name: aws-trigger-auth
+
+    # Database batch processing
+    database:
+      enabled: false
+      type: "postgresql"  # postgresql, mysql, mongodb
+      query: "SELECT COUNT(*) FROM pending_records WHERE status = 'pending'"
+      recordsPerJob: 100  # Each job processes 100 records
+      pollingInterval: 60
+      maxReplicaCount: 5
+      scalingStrategy: "accurate"
+      connectionFromEnv: "DATABASE_URL"
+      authenticationRef:
+        name: database-trigger-auth
+
+  # ------------------------------------------------------------------------------
+  # KEDA TriggerAuthentication Configuration
+  # ------------------------------------------------------------------------------
+  triggerAuthentication:
+    # Enable TriggerAuthentication
+    enabled: false
+
+    # Resource name override
+    name: ""
+
+    # Kubernetes Secret references
+    secretTargetRef: []
+      # - parameter: username
+      #   name: my-app-credentials
+      #   key: username
+      # - parameter: password
+      #   name: my-app-credentials
+      #   key: password
+
+    # Environment variable references
+    env: []
+      # - parameter: connectionString
+      #   name: DATABASE_URL
+      #   containerName: app
+
+    # Pod Identity (AWS IRSA, Azure Workload Identity, GCP Workload Identity)
+    podIdentity: {}
+      # provider: aws-eks  # aws-eks, azure-workload, gcp
+      # identityId: arn:aws:iam::123456789012:role/my-keda-role
+
+    # HashiCorp Vault direct integration
+    hashiCorpVault: {}
+      # address: https://vault:8200
+      # authentication: token
+      # credential:
+      #   token: my-vault-token
+      # secrets:
+      #   - parameter: username
+      #     key: database/creds/my-app
+      #     path: username
+      #   - parameter: password
+      #     key: database/creds/my-app
+      #     path: password
+
+    # Custom annotations
+    annotations: {}
+
+# ------------------------------------------------------------------------------
+# Common Configuration (inherited from common-forge)
+# ------------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+# Custom labels for all resources
+labels: {}
+
+# Custom annotations for all resources
+annotations: {}

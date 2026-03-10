@@ -1,0 +1,45 @@
+apiVersion: v2
+name: common-aws
+description: AWS-specific integration templates for ALB Ingress Controller, IRSA, and ECR
+type: library
+version: 0.1.0
+appVersion: "1.0"
+
+keywords:
+  - library
+  - forge
+  - aws
+  - alb
+  - irsa
+  - ecr
+  - eks
+  - ingress
+
+home: https://github.com/moai-forge/forge-helpers
+maintainers:
+  - name: Forge Platform Team
+    email: platform@moai.forge
+
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+  - name: common-kubernetes
+    version: ~0.1.0
+    repository: file://../common-kubernetes
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "aws-integration"
+  moai.forge.io/aws-services: "alb,irsa,ecr,eks"
+
+# AWS Integration Features:
+# - Modular ALB Ingress Controller annotations (health checks, auth, SSL, etc.)
+# - IRSA (IAM Roles for Service Accounts) helpers
+# - ECR authentication for private registries
+# - EKS-specific configurations
+#
+# Compatible with:
+# - AWS Load Balancer Controller v2.x
+# - EKS 1.23+
+# - IRSA (IAM Roles for Service Accounts)

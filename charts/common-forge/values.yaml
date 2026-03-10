@@ -1,0 +1,173 @@
+# ============================================================================
+# Forge Common Library - Default Values
+# ============================================================================
+# Foundation library for Forge platform. This library provides naming
+# conventions, validation, and labeling functions for all Forge charts.
+#
+# This is a LIBRARY chart - no resources are deployed directly.
+# These values serve as documentation and schema for consuming charts.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Forge Platform Configuration
+# ----------------------------------------------------------------------------
+forge:
+  # Customer identifier (lowercase alphanumeric, hyphens)
+  # Used in: customerClusterWide, customerNamespace, tenantNamespace patterns
+  customer: "default-customer"
+  
+  # Project name within customer scope
+  # Used in: customerClusterWide, customerNamespace, tenantNamespace patterns
+  project: "default-project"
+  
+  # Application name
+  # Used in: customerNamespace, tenantNamespace, namespacedResource patterns
+  application: "default-app"
+  
+  # Environment identifier (dev, staging, prod, etc.)
+  # Used in: tenantNamespace pattern for multi-environment deployments
+  environment: "dev"
+  
+  # Component within application (api, worker, frontend, etc.)
+  # Added to: app.kubernetes.io/component label
+  component: "default-component"
+  
+  # Higher-level application this component belongs to
+  # Added to: app.kubernetes.io/part-of label
+  partOf: "default-platform"
+  
+  # Explicit namespace override (bypasses pattern detection)
+  # If not set, namespace is derived from Release.Namespace or pattern
+  namespace: "default"
+  
+  # Common labels applied to ALL resources
+  # Merged with standard Kubernetes and Forge labels
+  commonLabels: {}
+    # example/label: "value"
+  
+  # Common annotations applied to ALL resources
+  # Useful for policy enforcement, monitoring, etc.
+  commonAnnotations: {}
+    # example/annotation: "value"
+
+# ----------------------------------------------------------------------------
+# Name Overrides
+# ----------------------------------------------------------------------------
+# Override automatic name generation
+# Priority: fullnameOverride > nameOverride > pattern-based > Chart.Name
+
+# Override chart name (used in forge.name)
+nameOverride: "default"
+
+# Override full resource name (bypasses ALL pattern logic)
+# Use sparingly - breaks naming consistency
+fullnameOverride: "default"
+
+# ----------------------------------------------------------------------------
+# Resource-Specific Labels (Optional)
+# ----------------------------------------------------------------------------
+# Additional labels for specific resource types
+# Merged with forge.labels for each resource
+
+podLabels: {}
+serviceLabels: {}
+deploymentLabels: {}
+ingressLabels: {}
+configMapLabels: {}
+secretLabels: {}
+
+# ----------------------------------------------------------------------------
+# Validation Settings
+# ----------------------------------------------------------------------------
+validation:
+  # Enable strict validation (fail on any validation error)
+  # Recommended for production environments
+  strict: true
+  
+  # Validate labels against Kubernetes specs
+  validateLabels: true
+  
+  # Validate annotations against Kubernetes specs
+  validateAnnotations: true
+  
+  # Validate resource names (DNS-1123, DNS-1035 compliance)
+  validateNames: true
+  
+  # Maximum resource name length (Kubernetes: 253, Helm: 53 for releases)
+  maxNameLength: 253
+  
+  # Fail if namespace starts with "kube-" (reserved prefix)
+  failOnReservedNamespace: true
+
+# ----------------------------------------------------------------------------
+# Pattern Detection Settings
+# ----------------------------------------------------------------------------
+patterns:
+  # Automatically detect naming pattern from forge.* values
+  # If false, uses Release.Name-Chart.Name format
+  autoDetect: true
+  
+  # Preferred pattern when multiple patterns match
+  # Options: tenantNamespace, customerNamespace, customerClusterWide
+  preferredPattern: "tenantNamespace"
+  
+  # Use abbreviated resource types in names (deployment->deploy, service->svc)
+  useShortTypes: true
+  
+  # Maximum length before truncation (respects Kubernetes limits)
+  maxLength: 63
+
+# ----------------------------------------------------------------------------
+# Label Settings
+# ----------------------------------------------------------------------------
+labels:
+  # Include standard Kubernetes labels (app.kubernetes.io/*)
+  includeKubernetes: true
+  
+  # Include Forge platform labels (moai.forge.io/*)
+  includeForge: true
+  
+  # Include Helm metadata labels (helm.sh/*)
+  includeHelm: true
+  
+  # Propagate labels to pod templates
+  propagateToPods: true
+
+# ----------------------------------------------------------------------------
+# Documentation
+# ----------------------------------------------------------------------------
+# This chart provides the following naming patterns:
+#
+# 1. forge.name.common
+#    → "forge"
+#    Usage: Platform-wide shared resources
+#
+# 2. forge.name.shared
+#    → "forge-shared"
+#    Usage: Shared infrastructure
+#
+# 3. forge.name.sharedResource
+#    → "forge-shared-{type}"
+#    Usage: Shared ConfigMaps, Secrets
+#
+# 4. forge.name.namespacedResource
+#    → "{app}-{type}"
+#    Usage: Application resources within namespace
+#
+# 5. forge.name.customerClusterWide
+#    → "{customer}-{project}"
+#    Usage: Customer namespaces, cluster roles
+#
+# 6. forge.name.customerNamespace
+#    → "{customer}-{project}-{app}"
+#    Usage: Customer application namespaces
+#
+# 7. forge.name.tenantNamespace
+#    → "{customer}-{project}-{app}-{env}"
+#    Usage: Multi-tenant with environment separation
+#
+# 8. forge.name.customerResource
+#    → "{app}-{type}"
+#    Usage: Customer workload resources
+#
+# Pattern selection is automatic based on forge.* values set.

@@ -1,0 +1,322 @@
+# ==============================================================================
+# Kyverno API Restrictions - Production Configuration Example
+# ==============================================================================
+#
+# This example demonstrates how to block dangerous Kubernetes API operations
+# in a production cluster using Kyverno policies.
+#
+# Blocked Operations:
+#   - kubectl exec (pods/exec)
+#   - kubectl attach (pods/attach)
+#   - kubectl port-forward (pods/portforward)
+#   - kubectl proxy (pods/proxy)
+#   - kubectl debug (pods/ephemeralcontainers)
+#
+# Use Cases:
+#   - Production clusters with strict security requirements
+#   - Compliance requirements (SOC2, ISO 27001, PCI-DSS)
+#   - Force users to use proper debugging tools (Telepresence, logs)
+#   - Prevent unauthorized access to running containers
+#   - Audit all interactive pod access attempts
+#
+# Prerequisites:
+#   1. Kyverno 1.10+ installed in cluster
+#   2. common-kyverno library chart
+#
+# ==============================================================================
+
+kyverno:
+  # ===========================================================================
+  # API Restrictions Configuration
+  # ===========================================================================
+  apiRestrictions:
+    
+    # -------------------------------------------------------------------------
+    # Block kubectl exec (pods/exec)
+    # -------------------------------------------------------------------------
+    # Prevents users from executing commands inside running containers.
+    # This is the most critical operation to block in production.
+    blockExec:
+      enabled: true
+      action: enforce  # enforce = block, audit = log only
+      severity: high
+      failurePolicy: Fail
+      
+      # Custom message shown to users
+      message: |
+        ⛔ kubectl exec is not allowed in production clusters.
+        
+        Why? Direct shell access to containers poses security risks:
+        - No audit trail of commands executed
+        - Risk of accidental data modification
+        - Potential privilege escalation
+        
+        Alternatives:
+        1. View logs: kubectl logs <pod-name>
+        2. Debug locally: Use Telepresence (https://telepresence.io)
+        3. Ephemeral containers: kubectl debug <pod-name> --image=busybox (if enabled)
+        4. Emergency access: Contact SRE team via PagerDuty
+        
+        Documentation: https://wiki.company.com/kubernetes/debugging-production
+      
+      # Only block in production namespaces
+      includeNamespaces:
+        - production
+        - prod-*
+        - staging
+        - stage-*
+      
+      # Exclude system namespaces (allow operators)
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+        - monitoring
+        - logging
+      
+      # Allow specific users (break-glass accounts)
+      excludeUsers:
+        - cluster-admin
+        - sre-team-lead
+        - oncall-engineer
+      
+      # Allow specific service accounts
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:kubernetes-dashboard
+        - system:serviceaccount:monitoring:prometheus-operator
+        - system:serviceaccount:logging:fluentd
+      
+      # Additional annotations for monitoring
+      annotations:
+        policy.company.com/compliance: "SOC2,ISO27001"
+        policy.company.com/risk-level: "high"
+    
+    # -------------------------------------------------------------------------
+    # Block kubectl attach (pods/attach)
+    # -------------------------------------------------------------------------
+    # Prevents users from attaching to container stdin/stdout/stderr.
+    blockAttach:
+      enabled: true
+      action: enforce
+      severity: high
+      failurePolicy: Fail
+      
+      message: |
+        ⛔ kubectl attach is not allowed in production clusters.
+        
+        Use kubectl logs for log streaming:
+        - kubectl logs -f <pod-name>
+        - kubectl logs -f <pod-name> --previous
+      
+      includeNamespaces:
+        - production
+        - prod-*
+        - staging
+        - stage-*
+      
+      excludeNamespaces:
+        - kube-system
+        - monitoring
+        - logging
+      
+      excludeUsers:
+        - cluster-admin
+        - sre-team-lead
+      
+      annotations:
+        policy.company.com/compliance: "SOC2"
+    
+    # -------------------------------------------------------------------------
+    # Block kubectl port-forward (pods/portforward)
+    # -------------------------------------------------------------------------
+    # Prevents users from creating port forwarding tunnels.
+    # Port forwarding can bypass network policies and firewall rules.
+    blockPortForward:
+      enabled: true
+      action: enforce
+      severity: medium
+      failurePolicy: Fail
+      
+      message: |
+        ⛔ kubectl port-forward is not allowed in production clusters.
+        
+        Why? Port forwarding bypasses:
+        - Network policies
+        - Firewall rules
+        - Service mesh security
+        - API gateways
+        
+        Alternatives:
+        1. Use Ingress resources for HTTP services
+        2. Use LoadBalancer Services for TCP/UDP services
+        3. Use Telepresence for local development
+        4. Request temporary access via ServiceRequest
+        
+        Documentation: https://wiki.company.com/kubernetes/network-access
+      
+      includeNamespaces:
+        - production
+        - prod-*
+      
+      # Allow port-forward in staging for debugging
+      excludeNamespaces:
+        - staging
+        - stage-*
+        - development
+        - dev-*
+        - kube-system
+      
+      excludeUsers:
+        - cluster-admin
+        - network-team
+      
+      annotations:
+        policy.company.com/network-security: "enforce"
+    
+    # -------------------------------------------------------------------------
+    # Block kubectl proxy (pods/proxy)
+    # -------------------------------------------------------------------------
+    # Prevents users from creating proxy connections to pods.
+    blockProxy:
+      enabled: true
+      action: enforce
+      severity: medium
+      failurePolicy: Fail
+      
+      message: |
+        ⛔ kubectl proxy to pods is not allowed.
+        
+        Use proper Service and Ingress resources instead.
+      
+      includeNamespaces:
+        - production
+        - prod-*
+        - staging
+        - stage-*
+      
+      excludeNamespaces:
+        - kube-system
+      
+      excludeUsers:
+        - cluster-admin
+    
+    # -------------------------------------------------------------------------
+    # Block Ephemeral Containers (kubectl debug)
+    # -------------------------------------------------------------------------
+    # Prevents users from injecting debug containers into running pods.
+    # While kubectl debug is safer than exec, it still allows code execution.
+    blockEphemeralContainers:
+      enabled: true
+      action: enforce
+      severity: high
+      failurePolicy: Fail
+      
+      message: |
+        ⛔ Ephemeral containers (kubectl debug) are not allowed in production.
+        
+        Ephemeral containers can:
+        - Execute arbitrary code in the pod's namespace
+        - Access pod secrets and volumes
+        - Share the network namespace
+        
+        Alternatives:
+        1. Use kubectl logs for log analysis
+        2. Use Telepresence for local debugging
+        3. Create a debug pod in the same namespace
+        4. Contact SRE team for assistance
+        
+        Documentation: https://wiki.company.com/kubernetes/debugging-production
+      
+      includeNamespaces:
+        - production
+        - prod-*
+      
+      # Allow in staging for debugging
+      excludeNamespaces:
+        - staging
+        - stage-*
+        - development
+        - dev-*
+        - kube-system
+      
+      excludeUsers:
+        - cluster-admin
+        - sre-team-lead
+      
+      annotations:
+        policy.company.com/compliance: "SOC2,PCI-DSS"
+
+# ==============================================================================
+# How to Use This Configuration
+# ==============================================================================
+#
+# 1. Add to your Helm chart values:
+#    helm upgrade myapp . -f api-restrictions-production.yaml
+#
+# 2. Include templates in your chart:
+#    # templates/api-restrictions.yaml
+#    {{- include "kyverno.apiRestrictions.blockAll" . }}
+#
+# 3. Test with audit mode first (week 1-2):
+#    action: audit  # Log violations without blocking
+#
+# 4. Review PolicyReports:
+#    kubectl get polr -A
+#    kubectl describe polr <report-name> -n <namespace>
+#
+# 5. Enforce policies (week 3+):
+#    action: enforce  # Block violations
+#
+# ==============================================================================
+# Monitoring and Alerts
+# ==============================================================================
+#
+# 1. PolicyReports are created for each violation:
+#    kubectl get polr -n production
+#
+# 2. Set up alerts for policy violations:
+#    - Prometheus metrics: kyverno_policy_results_total
+#    - Grafana dashboard: https://grafana.com/grafana/dashboards/13995
+#
+# 3. Export to SIEM:
+#    - FluentD: Parse PolicyReport events
+#    - Splunk: Forward Kyverno audit logs
+#
+# ==============================================================================
+# Break-Glass Procedure
+# ==============================================================================
+#
+# In emergencies, temporarily disable policies:
+#
+# 1. Add user to excludeUsers list:
+#    kubectl edit clusterpolicy block-pod-exec
+#
+# 2. Or disable policy entirely:
+#    kubectl patch clusterpolicy block-pod-exec -p '{"spec":{"validationFailureAction":"audit"}}'
+#
+# 3. Document in incident report:
+#    - Who accessed
+#    - When accessed
+#    - Why accessed
+#    - What was changed
+#
+# 4. Re-enable after incident:
+#    kubectl patch clusterpolicy block-pod-exec -p '{"spec":{"validationFailureAction":"enforce"}}'
+#
+# ==============================================================================
+# Compliance Mapping
+# ==============================================================================
+#
+# SOC2 CC6.1: Access Control
+#   - Blocks unauthorized pod access
+#   - Audit trail via PolicyReports
+#   - Principle of least privilege
+#
+# ISO 27001 A.9.2: User Access Management
+#   - Restricts interactive access
+#   - Enforces proper authentication
+#
+# PCI-DSS 7.1: Access Control
+#   - Limits access to cardholder data
+#   - "Need-to-know" basis enforcement
+#
+# ==============================================================================

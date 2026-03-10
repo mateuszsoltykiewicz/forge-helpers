@@ -1,0 +1,40 @@
+apiVersion: v2
+name: common-hardening
+description: Namespace hardening templates for capacity-based resource quotas and network policies
+type: library
+version: 0.1.0
+appVersion: "1.0"
+
+keywords:
+  - library
+  - forge
+  - hardening
+  - resourcequota
+  - networkpolicy
+  - security
+  - capacity
+
+home: https://github.com/moai-forge/forge-helpers
+maintainers:
+  - name: Forge Platform Team
+    email: platform@moai.forge
+
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "hardening"
+  moai.forge.io/philosophy: "capacity-based-quotas"
+  moai.forge.io/measurement: "hpa-max-replicas-vpa-upperbounds-max-nodes"
+
+# Philosophy: Measure CAPACITY (what COULD be used), not USAGE (what IS used)
+# - HPA maxReplicas: Declared maximum scale (static config)
+# - VPA upperBound: P99 + headroom from 7+ days historical data
+# - Max nodes: Karpenter/ASG configuration limits
+# - Pod limits: Static manifest values
+#
+# This allows IMMEDIATE hardening after deployment (no waiting period!)
+# See namespace-hardening.sh for full implementation details.

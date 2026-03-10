@@ -1,0 +1,80 @@
+# ==============================================================================
+# Forge Common Library - Security
+# ==============================================================================
+# Library chart for security scanning and runtime protection resources.
+#
+# This library provides reusable Helm templates for security tooling:
+#   - Trivy: Vulnerability scanning for container images
+#   - Falco: Runtime security monitoring and threat detection
+#   - Security policies and configurations
+#
+# Features:
+#   - Image vulnerability scanning (CVE detection)
+#   - Runtime security rules (suspicious behavior detection)
+#   - Compliance scanning (CIS benchmarks)
+#   - Secret scanning (leaked credentials detection)
+#   - Security policy enforcement
+#   - Alert integration (Prometheus, Slack, PagerDuty)
+#
+# Integration:
+#   - Integrates with common-forge for naming and labels
+#   - Works with Trivy Operator for automated scanning
+#   - Compatible with Falco for runtime monitoring
+#   - Integrates with common-monitoring for alerting
+#
+# Requirements:
+#   - Helm 3.0+
+#   - Trivy Operator 0.16+ (for vulnerability scanning)
+#   - Falco 0.36+ (for runtime security)
+#   - Kubernetes 1.23-1.29
+#
+# Documentation:
+#   - https://aquasecurity.github.io/trivy-operator/
+#   - https://falco.org/docs/
+# ==============================================================================
+
+apiVersion: v2
+name: common-security
+description: Forge library chart for security scanning and runtime protection
+type: library
+version: 0.1.0
+appVersion: "1.0.0"
+
+# Maintainers
+maintainers:
+  - name: Moai Forge Team
+    email: forge@moai.dev
+
+# Dependencies
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+
+# Keywords for discoverability
+keywords:
+  - security
+  - vulnerability-scanning
+  - runtime-protection
+  - trivy
+  - falco
+  - compliance
+  - forge
+  - moai
+
+# Annotations
+annotations:
+  # Trivy Operator version tested
+  moai.forge.io/trivy-operator-version: "0.16.0"
+  
+  # Falco version tested
+  moai.forge.io/falco-version: "0.36.0"
+  
+  # Category for organization
+  moai.forge.io/category: "security"
+  
+  # Supported features
+  moai.forge.io/features: "vulnerability-scanning,runtime-security,compliance,secret-scanning"
+  
+  # Documentation URL
+  moai.forge.io/docs: "https://github.com/moai-forge/forge-helpers/charts/common-security"

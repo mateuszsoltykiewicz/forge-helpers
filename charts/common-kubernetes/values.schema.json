@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common Kubernetes Library - Values Schema",
+  "type": "object",
+  "properties": {
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "replicas": {"type": "integer", "minimum": 0},
+        "strategy": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string", "enum": ["RollingUpdate", "Recreate"]}
+          }
+        }
+      }
+    },
+    "statefulset": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "serviceName": {"type": "string"},
+        "replicas": {"type": "integer", "minimum": 0},
+        "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]}
+      }
+    },
+    "daemonset": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "job": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "backoffLimit": {"type": "integer", "minimum": 0},
+        "completions": {"type": "integer", "minimum": 1},
+        "parallelism": {"type": "integer", "minimum": 1},
+        "restartPolicy": {"type": "string", "enum": ["OnFailure", "Never"]}
+      }
+    },
+    "cronjob": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "schedule": {"type": "string", "pattern": "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+(\\/|-)\\d+)|\\d+|\\*) ?){5,7})$"},
+        "concurrencyPolicy": {"type": "string", "enum": ["Allow", "Forbid", "Replace"]},
+        "restartPolicy": {"type": "string", "enum": ["OnFailure", "Never"]}
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "type": {"type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]},
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "port"],
+            "properties": {
+              "name": {"type": "string"},
+              "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+              "targetPort": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+              "protocol": {"type": "string", "enum": ["TCP", "UDP", "SCTP"]}
+            }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "ingressClassName": {"type": "string"},
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["host", "paths"],
+            "properties": {
+              "host": {"type": "string"},
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["path"],
+                  "properties": {
+                    "path": {"type": "string"},
+                    "pathType": {"type": "string", "enum": ["Exact", "Prefix", "ImplementationSpecific"]}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "configMap": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "immutable": {"type": "boolean"},
+        "data": {"type": "object"}
+      }
+    },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "type": {"type": "string"},
+        "immutable": {"type": "boolean"}
+      }
+    },
+    "pvc": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "size": {"type": "string", "pattern": "^[0-9]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K|m)?$"},
+        "accessModes": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"]}
+        },
+        "volumeMode": {"type": "string", "enum": ["Filesystem", "Block"]}
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {"type": "boolean"},
+        "name": {"type": "string"},
+        "automountServiceAccountToken": {"type": "boolean"}
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "properties": {
+        "create": {"type": "boolean"}
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "minReplicas": {"type": "integer", "minimum": 1},
+        "maxReplicas": {"type": "integer", "minimum": 1},
+        "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100},
+        "targetMemoryUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "vpa": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "pdb": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "podMonitor": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": {"type": "string"},
+        "repository": {"type": "string"},
+        "tag": {"type": "string"},
+        "digest": {"type": "string"},
+        "pullPolicy": {"type": "string", "enum": ["Always", "Never", "IfNotPresent"]}
+      }
+    },
+    "vault": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "agent": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "role": {"type": "string"},
+            "prePopulate": {"type": "boolean"},
+            "prePopulateOnly": {"type": "boolean"}
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
+        "verification": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "mode": {"type": "string", "enum": ["verbose", "minimal", "silent"]},
+            "required": {"type": "array", "items": {"type": "string"}},
+            "optional": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

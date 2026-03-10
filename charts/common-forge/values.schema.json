@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "common-forge",
+  "description": "Values schema for Forge Common Library (Foundation)",
+  "type": "object",
+  "properties": {
+    "forge": {
+      "type": "object",
+      "description": "Forge platform configuration",
+      "properties": {
+        "customer": {
+          "type": "string",
+          "description": "Customer identifier (lowercase alphanumeric, hyphens)",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "project": {
+          "type": "string",
+          "description": "Project name within customer scope",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "application": {
+          "type": "string",
+          "description": "Application name",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "environment": {
+          "type": "string",
+          "description": "Environment identifier",
+          "enum": ["dev", "development", "staging", "stage", "prod", "production", "test", "qa", "uat"],
+          "examples": ["dev", "staging", "prod"]
+        },
+        "component": {
+          "type": "string",
+          "description": "Component within application",
+          "pattern": "^[a-z0-9A-Z]([_.-]?[a-z0-9A-Z])*$",
+          "maxLength": 63,
+          "examples": ["api", "worker", "frontend", "database"]
+        },
+        "partOf": {
+          "type": "string",
+          "description": "Higher-level application",
+          "pattern": "^[a-z0-9A-Z]([_.-]?[a-z0-9A-Z])*$",
+          "maxLength": 63
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Explicit namespace override",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "commonLabels": {
+          "type": "object",
+          "description": "Common labels applied to all resources",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 63
+          }
+        },
+        "commonAnnotations": {
+          "type": "object",
+          "description": "Common annotations applied to all resources",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override chart name",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 63
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override full resource name",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 63
+    },
+    "podLabels": {
+      "type": "object",
+      "description": "Additional labels for Pod resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "serviceLabels": {
+      "type": "object",
+      "description": "Additional labels for Service resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "deploymentLabels": {
+      "type": "object",
+      "description": "Additional labels for Deployment resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ingressLabels": {
+      "type": "object",
+      "description": "Additional labels for Ingress resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "configMapLabels": {
+      "type": "object",
+      "description": "Additional labels for ConfigMap resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "secretLabels": {
+      "type": "object",
+      "description": "Additional labels for Secret resources",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation settings",
+      "properties": {
+        "strict": {
+          "type": "boolean",
+          "description": "Enable strict validation",
+          "default": true
+        },
+        "validateLabels": {
+          "type": "boolean",
+          "description": "Validate labels against Kubernetes specs",
+          "default": true
+        },
+        "validateAnnotations": {
+          "type": "boolean",
+          "description": "Validate annotations against Kubernetes specs",
+          "default": true
+        },
+        "validateNames": {
+          "type": "boolean",
+          "description": "Validate resource names",
+          "default": true
+        },
+        "maxNameLength": {
+          "type": "integer",
+          "description": "Maximum resource name length",
+          "minimum": 1,
+          "maximum": 253,
+          "default": 253
+        },
+        "failOnReservedNamespace": {
+          "type": "boolean",
+          "description": "Fail if namespace starts with 'kube-'",
+          "default": true
+        }
+      }
+    },
+    "patterns": {
+      "type": "object",
+      "description": "Pattern detection settings",
+      "properties": {
+        "autoDetect": {
+          "type": "boolean",
+          "description": "Automatically detect naming pattern",
+          "default": true
+        },
+        "preferredPattern": {
+          "type": "string",
+          "description": "Preferred pattern when multiple match",
+          "enum": ["tenantNamespace", "customerNamespace", "customerClusterWide"],
+          "default": "tenantNamespace"
+        },
+        "useShortTypes": {
+          "type": "boolean",
+          "description": "Use abbreviated resource types",
+          "default": true
+        },
+        "maxLength": {
+          "type": "integer",
+          "description": "Maximum length before truncation",
+          "minimum": 1,
+          "maximum": 63,
+          "default": 63
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "description": "Label settings",
+      "properties": {
+        "includeKubernetes": {
+          "type": "boolean",
+          "description": "Include Kubernetes standard labels",
+          "default": true
+        },
+        "includeForge": {
+          "type": "boolean",
+          "description": "Include Forge platform labels",
+          "default": true
+        },
+        "includeHelm": {
+          "type": "boolean",
+          "description": "Include Helm metadata labels",
+          "default": true
+        },
+        "propagateToPods": {
+          "type": "boolean",
+          "description": "Propagate labels to pod templates",
+          "default": true
+        }
+      }
+    }
+  }
+}

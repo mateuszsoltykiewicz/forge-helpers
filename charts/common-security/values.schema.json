@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common Security Configuration",
+  "description": "JSON Schema for validating security library chart configuration",
+  "type": "object",
+  "properties": {
+    "security": {
+      "type": "object",
+      "properties": {
+        "trivy": {
+          "type": "object",
+          "properties": {
+            "namespace": {"type": "string"},
+            "vulnerabilityReport": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "severities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+                  }
+                },
+                "ignoreUnfixed": {"type": "boolean"},
+                "ignoreVulnerabilities": {"type": "array", "items": {"type": "string"}},
+                "skipDirs": {"type": "array", "items": {"type": "string"}},
+                "skipFiles": {"type": "array", "items": {"type": "string"}},
+                "timeout": {"type": "string"},
+                "offlineScan": {"type": "boolean"},
+                "labels": {"type": "object"},
+                "annotations": {"type": "object"}
+              }
+            },
+            "configAuditReport": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "severities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+                  }
+                },
+                "compliance": {"type": "array", "items": {"type": "string"}},
+                "scanners": {"type": "array", "items": {"type": "string"}},
+                "labels": {"type": "object"}
+              }
+            },
+            "secretScan": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "secretTypes": {"type": "array", "items": {"type": "string"}},
+                "excludePaths": {"type": "array", "items": {"type": "string"}},
+                "allowRules": {"type": "array"},
+                "labels": {"type": "object"}
+              }
+            },
+            "scanJob": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "schedule": {"type": "string"},
+                "imageRef": {"type": "string"},
+                "image": {"type": "string"},
+                "imagePullPolicy": {"type": "string", "enum": ["Always", "IfNotPresent", "Never"]},
+                "severity": {"type": "array", "items": {"type": "string"}},
+                "ignoreUnfixed": {"type": "boolean"},
+                "serviceAccountName": {"type": "string"},
+                "imagePullSecrets": {"type": "array"},
+                "successfulJobsHistoryLimit": {"type": "integer", "minimum": 0},
+                "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
+                "concurrencyPolicy": {
+                  "type": "string",
+                  "enum": ["Allow", "Forbid", "Replace"]
+                },
+                "resources": {"type": "object"},
+                "tolerations": {"type": "array"},
+                "nodeSelector": {"type": "object"},
+                "nodeAffinity": {"type": "object"},
+                "podAffinity": {"type": "object"},
+                "podAntiAffinity": {"type": "object"}
+              }
+            }
+          }
+        },
+        "falco": {
+          "type": "object",
+          "properties": {
+            "namespace": {"type": "string"},
+            "rules": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "customRules": {"type": "string"},
+                "macros": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": "string"},
+                      "condition": {"type": "string"}
+                    },
+                    "required": ["name", "condition"]
+                  }
+                },
+                "lists": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": "string"},
+                      "items": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "required": ["name", "items"]
+                  }
+                },
+                "labels": {"type": "object"},
+                "annotations": {"type": "object"}
+              }
+            },
+            "applicationRules": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "allowedProcesses": {"type": "array", "items": {"type": "string"}},
+                "suspiciousIPs": {"type": "array", "items": {"type": "string"}},
+                "priority": {
+                  "type": "string",
+                  "enum": ["EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG"]
+                }
+              }
+            },
+            "complianceRules": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "priority": {
+                  "type": "string",
+                  "enum": ["EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

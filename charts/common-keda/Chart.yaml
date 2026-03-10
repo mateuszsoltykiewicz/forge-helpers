@@ -1,0 +1,60 @@
+apiVersion: v2
+name: common-keda
+description: |
+  Forge Common Library for KEDA (Kubernetes Event-Driven Autoscaling) integration.
+  
+  Provides reusable templates for:
+    - ScaledObject (event-driven HPA replacement)
+    - ScaledJob (event-driven batch processing)
+    - Trigger definitions (Prometheus, RabbitMQ, AWS SQS, Kafka, etc.)
+    - Vault secret integration for trigger authentication
+  
+  Features:
+    - 60+ KEDA scalers support (Prometheus, AWS, Azure, GCP, databases, message queues)
+    - TriggerAuthentication with Vault integration
+    - Fallback configuration (cooldown period, min/max replicas)
+    - Advanced scaling strategies (multiple triggers, custom metrics)
+  
+  Compatible with:
+    - KEDA 2.10+
+    - Kubernetes 1.23-1.29
+    - HashiCorp Vault (via common-vault)
+
+type: library
+version: 0.1.0
+appVersion: "2.13.0"
+
+keywords:
+  - library
+  - forge
+  - keda
+  - autoscaling
+  - event-driven
+  - hpa
+  - scaledobject
+  - scaledjob
+  - triggers
+
+maintainers:
+  - name: Forge Platform Team
+    email: platform@forge.example.com
+
+home: https://keda.sh
+sources:
+  - https://github.com/kedacore/keda
+
+dependencies:
+  - name: common-forge
+    version: ~0.1.0
+    repository: file://../common-forge
+  - name: common-vault
+    version: ~0.1.0
+    repository: file://../common-vault
+    condition: vault.enabled
+
+annotations:
+  moai.forge.io/chart-type: "library"
+  moai.forge.io/component: "keda-integration"
+  moai.forge.io/category: "autoscaling"
+  moai.forge.io/keda-version: "2.13.0"
+  moai.forge.io/supported-triggers: "prometheus,rabbitmq,aws-sqs,kafka,redis,postgresql,mysql"

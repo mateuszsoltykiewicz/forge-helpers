@@ -1,0 +1,30 @@
+# ==============================================================================
+# Helm Ignore File
+# ==============================================================================
+# Patterns to ignore when building packages.
+
+# Version control
+.git/
+.gitignore
+
+# CI/CD
+.gitlab-ci.yml
+.github/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (if not needed in package)
+# README.md
+
+# Testing
+tests/
+*.test.yaml

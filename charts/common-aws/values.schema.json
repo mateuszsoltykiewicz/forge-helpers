@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common AWS Configuration",
+  "description": "AWS-specific integrations for Kubernetes resources (ALB, IRSA, ECR)",
+  "type": "object",
+  "properties": {
+    "aws": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[0-9]{12}$",
+          "description": "AWS account ID (12-digit number)"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[a-z]+-[0-9]{1}$",
+          "description": "AWS region (e.g., us-east-1, eu-west-1)"
+        },
+        "alb": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "scheme": {"type": "string", "enum": ["internet-facing", "internal"]},
+            "targetType": {"type": "string", "enum": ["ip", "instance"]},
+            "ipAddressType": {"type": "string", "enum": ["ipv4", "dualstack"]},
+            "subnets": {"type": "array", "items": {"type": "string"}},
+            "securityGroups": {"type": "array", "items": {"type": "string"}},
+            "inboundCidrs": {"type": "array", "items": {"type": "string"}},
+            "healthcheck": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "protocol": {"type": "string", "enum": ["HTTP", "HTTPS"]},
+                "path": {"type": "string"},
+                "port": {"type": ["string", "integer"]},
+                "intervalSeconds": {"type": "integer", "minimum": 5, "maximum": 300},
+                "timeoutSeconds": {"type": "integer", "minimum": 2, "maximum": 120},
+                "healthyThresholdCount": {"type": "integer", "minimum": 2, "maximum": 10},
+                "unhealthyThresholdCount": {"type": "integer", "minimum": 2, "maximum": 10},
+                "successCodes": {"type": "string"}
+              }
+            },
+            "ssl": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "certificateArn": {"type": "string"},
+                "sslPolicy": {"type": "string"},
+                "redirectHttp": {"type": "boolean"},
+                "listenPorts": {"type": "array"}
+              }
+            },
+            "auth": {
+              "type": "object",
+              "properties": {
+                "cognito": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"type": "boolean"},
+                    "userPoolArn": {"type": "string"},
+                    "userPoolClientId": {"type": "string"},
+                    "userPoolDomain": {"type": "string"},
+                    "scope": {"type": "string"},
+                    "sessionCookieName": {"type": "string"},
+                    "sessionTimeout": {"type": "integer"},
+                    "onUnauthenticatedRequest": {"type": "string", "enum": ["authenticate", "allow", "deny"]}
+                  }
+                },
+                "oidc": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"type": "boolean"},
+                    "issuer": {"type": "string"},
+                    "clientId": {"type": "string"},
+                    "clientSecret": {"type": "string"},
+                    "scope": {"type": "string"},
+                    "sessionTimeout": {"type": "integer"},
+                    "onUnauthenticatedRequest": {"type": "string", "enum": ["authenticate", "allow", "deny"]}
+                  }
+                }
+              }
+            },
+            "targetGroup": {
+              "type": "object",
+              "properties": {
+                "stickinessEnabled": {"type": "boolean"},
+                "stickinessDurationSeconds": {"type": "integer"},
+                "deregistrationDelaySeconds": {"type": "integer"},
+                "slowStartDurationSeconds": {"type": "integer"},
+                "loadBalancingAlgorithm": {"type": "string", "enum": ["round_robin", "least_outstanding_requests"]}
+              }
+            },
+            "waf": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "webAclArn": {"type": "string"}
+              }
+            },
+            "shield": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "accessLogs": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "s3Bucket": {"type": "string"},
+                "s3Prefix": {"type": "string"}
+              }
+            },
+            "tags": {"type": "object"}
+          }
+        },
+        "irsa": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "roleArn": {"type": "string"},
+            "roleNamePrefix": {"type": "string"},
+            "tokenExpiration": {"type": "integer"},
+            "audienceOverride": {"type": "string"},
+            "stsRegionalEndpoints": {"type": "boolean"}
+          }
+        },
+        "ecr": {
+          "type": "object",
+          "properties": {
+            "repository": {"type": "string"},
+            "imagePullSecretName": {"type": "string"},
+            "publicAlias": {"type": "string"},
+            "sourceAccountId": {"type": "string", "pattern": "^[0-9]{12}$"},
+            "sourceRegion": {"type": "string"}
+          }
+        }
+      }
+    },
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "labels": {"type": "object"},
+    "annotations": {"type": "object"}
+  }
+}

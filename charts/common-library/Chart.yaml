@@ -1,0 +1,49 @@
+apiVersion: v2
+name: common-library
+description: |
+  Forge Common Library Chart - A reusable Helm library chart providing standardized
+  templates and patterns for deploying applications in the Forge platform.
+  
+  This library chart provides:
+  - Standardized naming conventions following Forge patterns (customer-project-environment-service)
+  - Generic workload templates (Deployment, StatefulSet, DaemonSet, Job, CronJob)
+  - Service, Ingress, and NetworkPolicy templates
+  - ConfigMap, Secret, and ServiceAccount management
+  - RBAC (Role, RoleBinding) templates
+  - Horizontal Pod Autoscaler and Pod Disruption Budget templates
+  - Comprehensive helper functions for labels, selectors, and resource naming
+  - Security context and affinity rule builders
+  - Health probe generators
+  - Resource calculation helpers
+  
+  Usage:
+    Add as a dependency in your Chart.yaml:
+    
+    dependencies:
+      - name: common-library
+        version: "~0.1.0"
+        repository: "file://../common-library"
+
+type: library
+version: 0.1.0
+appVersion: "1.0"
+
+keywords:
+  - library
+  - forge
+  - common
+  - templates
+  - kubernetes
+
+home: https://github.com/forge/forge-helpers
+sources:
+  - https://github.com/forge/forge-helpers/tree/main/charts/common-library
+
+maintainers:
+  - name: Forge Team
+    email: forge@example.com
+
+annotations:
+  forge.io/chart-type: "library"
+  forge.io/platform-version: "1.0"
+  forge.io/compatibility: "kubernetes:>=1.23.0"

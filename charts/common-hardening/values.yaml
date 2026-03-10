@@ -1,0 +1,145 @@
+# ==============================================================================
+# Forge Common Library - common-hardening values.yaml
+# ==============================================================================
+# Capacity-based namespace hardening configuration.
+#
+# Philosophy: Measure CAPACITY (what COULD be used), not USAGE (what IS used).
+# This enables IMMEDIATE hardening after deployment - no waiting needed!
+#
+# See README.md for full documentation and examples.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# RESOURCE QUOTA (Capacity-Based)
+# ------------------------------------------------------------------------------
+
+resourceQuota:
+  enabled: false
+  nameOverride: ""
+  
+  # Measurement metadata
+  hardeningVersion: "2.0.0"
+  measurementSource: "hpa-vpa-limits"  # or "goldilocks", "manual"
+  bufferPercent: 20                     # Buffer above measured capacity
+  minVpaAgeDays: 7                      # Minimum VPA recommendation age
+  
+  annotations: {}
+  # moai.forge.io/hardened-by: "namespace-hardening.sh"
+  # moai.forge.io/workload-types: "Deployment,StatefulSet,DaemonSet"
+  
+  # CPU limits (millicores or with 'm' suffix)
+  cpu:
+    limits: ""     # e.g., "5000m" or "5"
+    requests: ""   # Optional, usually same as limits
+  
+  # Memory limits (with unit: Mi, Gi, etc.)
+  memory:
+    limits: ""     # e.g., "16Gi"
+    requests: ""   # Optional, usually same as limits
+  
+  # Pod count (from HPA maxReplicas + PDB + DaemonSets)
+  pods: null       # e.g., 50
+  
+  # PersistentVolumeClaims (from StatefulSet volumeClaimTemplates)
+  persistentvolumeclaims: null  # e.g., 10
+  
+  # Optional resource limits
+  services: null
+  configmaps: null
+  secrets: null
+  replicationcontrollers: null
+  loadbalancers: null
+  nodeports: null
+
+# Workload configurations (for automatic capacity calculation)
+workloads: []
+# - name: api
+#   type: Deployment
+#   replicas: 3
+#   cpuLimit: "500m"
+#   memoryLimit: "512Mi"
+#   hpa:
+#     enabled: true
+#     maxReplicas: 10
+#   vpa:
+#     enabled: true
+#     upperBound: "600m"
+#     memoryUpperBound: "600Mi"
+#     ageDays: 14
+#   pdb:
+#     enabled: true
+#     minAvailable: 2
+#   pvcCount: 0
+#
+# - name: worker
+#   type: Deployment
+#   replicas: 2
+#   cpuLimit: "1000m"
+#   memoryLimit: "1Gi"
+#   keda:
+#     enabled: true
+#     maxReplicas: 20
+#
+# - name: database
+#   type: StatefulSet
+#   replicas: 3
+#   cpuLimit: "2000m"
+#   memoryLimit: "4Gi"
+#   pvcCount: 1
+#
+# - name: logger
+#   type: DaemonSet
+#   cpuLimit: "100m"
+#   memoryLimit: "128Mi"
+
+# Maximum node count (for DaemonSet capacity calculation)
+maxNodes: 100  # From Karpenter/ASG/ConfigMap
+
+# ------------------------------------------------------------------------------
+# NETWORK POLICY (by Namespace Type)
+# ------------------------------------------------------------------------------
+
+networkPolicy:
+  enabled: false
+  
+  # Namespace type determines policy set
+  # Options: application, middleware, forge-jobs, forge-operator, admin, platform
+  namespaceType: "application"
+  
+  # Allow traffic between pods in same namespace
+  allowInternalTraffic: true
+  
+  # Custom policies (merged with type-specific policies)
+  customPolicies: []
+  # - name: allow-database
+  #   spec:
+  #     podSelector: {}
+  #     egress:
+  #     - to:
+  #       - namespaceSelector:
+  #           matchLabels:
+  #             moai.forge.io/type: middleware
+  #       ports:
+  #       - protocol: TCP
+  #         port: 5432
+
+# ------------------------------------------------------------------------------
+# COMMON CONFIGURATION (from common-forge)
+# ------------------------------------------------------------------------------
+
+# Naming configuration
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+# Labels configuration
+labels:
+  app: ""
+  component: "hardening"
+  partOf: ""
+  version: ""
+  managedBy: "Helm"
+  customer: ""
+  project: ""
+  environment: ""
+  additionalLabels: {}

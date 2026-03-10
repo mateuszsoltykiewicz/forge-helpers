@@ -1,0 +1,9 @@
+dependencies:
+- name: common-forge
+  repository: file://../common-forge
+  version: 0.1.0
+- name: common-vault
+  repository: file://../common-vault
+  version: 0.1.0
+digest: sha256:5a0cdd11b9df3e666bdb94bd9ebc3fa43a1cc6074e66ff8e4f9c5b3460f7f17b
+generated: "2026-02-23T11:47:55.416292+01:00"

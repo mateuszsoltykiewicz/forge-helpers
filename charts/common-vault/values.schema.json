@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "common-vault",
+  "description": "Values schema for Forge Vault Integration Library",
+  "type": "object",
+  "properties": {
+    "vault": {
+      "type": "object",
+      "description": "Vault configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Vault Agent Injector",
+          "default": false
+        },
+        "role": {
+          "type": "string",
+          "description": "Vault Kubernetes authentication role",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "address": {
+          "type": "string",
+          "description": "Vault service address",
+          "format": "uri",
+          "examples": ["http://vault.vault.svc.cluster.local:8200"]
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Vault namespace (Enterprise)"
+        },
+        "prePopulateOnly": {
+          "type": "boolean",
+          "description": "Pre-populate secrets only (no sidecar)",
+          "default": false
+        },
+        "preserveSecretCase": {
+          "type": "boolean",
+          "description": "Preserve case of secret keys",
+          "default": false
+        },
+        "agent": {
+          "type": "object",
+          "description": "Vault Agent configuration",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "properties": {
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {"type": "string"},
+                    "memory": {"type": "string"}
+                  }
+                },
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {"type": "string"},
+                    "memory": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "init": {
+          "type": "object",
+          "description": "Vault Agent init container configuration",
+          "properties": {
+            "first": {
+              "type": "boolean",
+              "description": "Run init container first",
+              "default": true
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {"type": "string"},
+                    "memory": {"type": "string"}
+                  }
+                },
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {"type": "string"},
+                    "memory": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "description": "Vault Agent cache configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "useAutoAuthToken": {
+              "type": "boolean",
+              "default": true
+            },
+            "persist": {
+              "type": "boolean",
+              "default": false
+            },
+            "persistPath": {
+              "type": "string",
+              "default": "/vault/agent-cache"
+            },
+            "exitOnErr": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "description": "TLS configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "caCertPath": {
+              "type": "string",
+              "default": "/vault/tls/ca.crt"
+            },
+            "secretName": {
+              "type": "string",
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+            },
+            "serverName": {
+              "type": "string"
+            },
+            "skipVerify": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "description": "Authentication configuration",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["kubernetes", "jwt", "aws", "azure", "gcp"],
+              "default": "kubernetes"
+            },
+            "path": {
+              "type": "string"
+            },
+            "config": {
+              "type": "string"
+            }
+          }
+        },
+        "log": {
+          "type": "object",
+          "description": "Logging configuration",
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": ["trace", "debug", "info", "warn", "error"],
+              "default": "info"
+            },
+            "format": {
+              "type": "string",
+              "enum": ["standard", "json"],
+              "default": "standard"
+            }
+          }
+        },
+        "runAsUser": {
+          "type": ["string", "integer"]
+        },
+        "runAsGroup": {
+          "type": ["string", "integer"]
+        },
+        "runAsSameUser": {
+          "type": "boolean",
+          "default": false
+        },
+        "sections": {
+          "type": "array",
+          "description": "Secret sections configuration",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Vault secret path"
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          },
+          "examples": [
+            [
+              {"app": "secret/data/acme/app/config"},
+              {"database": "secret/data/acme/app/database"}
+            ]
+          ]
+        },
+        "verification": {
+          "type": "object",
+          "description": "Variable verification configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["verbose", "minimal", "silent"],
+              "default": "verbose"
+            }
+          }
+        },
+        "requiredVars": {
+          "type": "array",
+          "description": "Required environment variables",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "examples": [["DB_HOST", "DB_PORT", "API_KEY"]]
+        },
+        "optionalVars": {
+          "type": "array",
+          "description": "Optional environment variables",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "examples": [["DEBUG_MODE", "CACHE_TTL"]]
+        }
+      }
+    }
+  }
+}

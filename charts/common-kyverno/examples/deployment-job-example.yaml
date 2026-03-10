@@ -1,0 +1,382 @@
+# CI/CD Deployment Job Example
+# ServiceAccount-based deployment that bypasses resource management restrictions
+
+---
+# Namespace for CI/CD tools
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-cd
+  labels:
+    name: ci-cd
+    forge.io/managed-by: platform-team
+
+---
+# ServiceAccount for deployment jobs
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-job
+  namespace: ci-cd
+  labels:
+    forge.io/component: ci-cd
+  annotations:
+    description: "ServiceAccount for CI/CD deployment jobs"
+
+---
+# ClusterRole with permissions to deploy applications
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deployment-job-role
+  labels:
+    forge.io/component: ci-cd
+rules:
+  # Workload resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # Core resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # Batch resources
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # Networking resources
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # Storage resources
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # HPA and scaling
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  
+  # Read-only for other resources
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes", "events"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding to grant permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: deployment-job-binding
+  labels:
+    forge.io/component: ci-cd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: deployment-job-role
+subjects:
+  - kind: ServiceAccount
+    name: deployment-job
+    namespace: ci-cd
+
+---
+# Example Deployment Job (Kubernetes Job)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deploy-myapp-v2-0-0
+  namespace: ci-cd
+  labels:
+    app: myapp
+    version: v2.0.0
+    forge.io/component: deployment
+  annotations:
+    forge.io/git-commit: "abc123def456"
+    forge.io/git-branch: "main"
+    forge.io/triggered-by: "github-actions"
+    forge.io/build-url: "https://github.com/company/myapp/actions/runs/123456"
+spec:
+  # Don't restart on failure (manual re-deploy)
+  backoffLimit: 0
+  
+  # Auto-cleanup after 24 hours
+  ttlSecondsAfterFinished: 86400
+  
+  # Timeout after 10 minutes
+  activeDeadlineSeconds: 600
+  
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: v2.0.0
+    spec:
+      # Use deployment-job ServiceAccount (bypasses Kyverno restrictions)
+      serviceAccountName: deployment-job
+      
+      restartPolicy: Never
+      
+      containers:
+        - name: deploy
+          image: alpine/helm:3.13.0
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              
+              echo "==================================="
+              echo "Deploying myapp v2.0.0"
+              echo "==================================="
+              
+              # Add Helm repository
+              helm repo add mycompany https://charts.company.com
+              helm repo update
+              
+              # Deploy application
+              helm upgrade --install myapp mycompany/myapp \
+                --namespace production \
+                --create-namespace \
+                --version 2.0.0 \
+                --set image.tag=v2.0.0 \
+                --set replicaCount=3 \
+                --set resources.limits.cpu=1000m \
+                --set resources.limits.memory=1Gi \
+                --wait \
+                --timeout 5m
+              
+              echo ""
+              echo "==================================="
+              echo "Deployment successful!"
+              echo "==================================="
+              
+              # Verify deployment
+              kubectl get deployment myapp -n production
+              kubectl get pods -n production -l app=myapp
+          
+          env:
+            - name: HELM_CACHE_HOME
+              value: /tmp/helm/cache
+            - name: HELM_CONFIG_HOME
+              value: /tmp/helm/config
+            - name: HELM_DATA_HOME
+              value: /tmp/helm/data
+          
+          # Non-privileged security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          # Resource limits
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          
+          # Writable directories
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: helm-cache
+              mountPath: /tmp/helm
+      
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: helm-cache
+          emptyDir: {}
+
+---
+# ==============================================================================
+# GitHub Actions Workflow Example
+# ==============================================================================
+# 
+# .github/workflows/deploy.yml
+# 
+# name: Deploy to Production
+# 
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'charts/myapp/**'
+# 
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       
+#       - name: Configure kubectl
+#         uses: azure/k8s-set-context@v3
+#         with:
+#           method: kubeconfig
+#           kubeconfig: ${{ secrets.KUBE_CONFIG }}
+#       
+#       - name: Deploy via Job
+#         run: |
+#           # Generate Job manifest
+#           cat <<EOF | kubectl apply -f -
+#           apiVersion: batch/v1
+#           kind: Job
+#           metadata:
+#             name: deploy-myapp-${GITHUB_SHA::8}
+#             namespace: ci-cd
+#             annotations:
+#               forge.io/git-commit: "${GITHUB_SHA}"
+#               forge.io/git-branch: "${GITHUB_REF_NAME}"
+#               forge.io/triggered-by: "github-actions"
+#               forge.io/build-url: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+#           spec:
+#             template:
+#               spec:
+#                 serviceAccountName: deployment-job
+#                 restartPolicy: Never
+#                 containers:
+#                   - name: deploy
+#                     image: alpine/helm:3.13.0
+#                     command:
+#                       - sh
+#                       - -c
+#                       - |
+#                         helm upgrade --install myapp ./charts/myapp \
+#                           --namespace production \
+#                           --create-namespace \
+#                           --wait
+#           EOF
+#       
+#       - name: Wait for Job
+#         run: |
+#           kubectl wait --for=condition=complete \
+#             --timeout=10m \
+#             job/deploy-myapp-${GITHUB_SHA::8} \
+#             -n ci-cd
+#       
+#       - name: Get Job Logs
+#         if: always()
+#         run: |
+#           kubectl logs -n ci-cd \
+#             job/deploy-myapp-${GITHUB_SHA::8} \
+#             --tail=-1
+# 
+# ==============================================================================
+# GitLab CI Example
+# ==============================================================================
+# 
+# .gitlab-ci.yml
+# 
+# deploy:
+#   stage: deploy
+#   image: bitnami/kubectl:latest
+#   script:
+#     - kubectl config use-context production
+#     - |
+#       cat <<EOF | kubectl apply -f -
+#       apiVersion: batch/v1
+#       kind: Job
+#       metadata:
+#         name: deploy-myapp-${CI_COMMIT_SHORT_SHA}
+#         namespace: ci-cd
+#         annotations:
+#           forge.io/git-commit: "${CI_COMMIT_SHA}"
+#           forge.io/git-branch: "${CI_COMMIT_REF_NAME}"
+#           forge.io/triggered-by: "gitlab-ci"
+#           forge.io/pipeline-url: "${CI_PIPELINE_URL}"
+#       spec:
+#         template:
+#           spec:
+#             serviceAccountName: deployment-job
+#             restartPolicy: Never
+#             containers:
+#               - name: deploy
+#                 image: alpine/helm:3.13.0
+#                 command: ["helm", "upgrade", "--install", "myapp", "./charts/myapp"]
+#       EOF
+#     - kubectl wait --for=condition=complete job/deploy-myapp-${CI_COMMIT_SHORT_SHA} -n ci-cd
+#   only:
+#     - main
+#   environment:
+#     name: production
+# 
+# ==============================================================================
+# Manual Deployment (Testing)
+# ==============================================================================
+# 
+# Create Job manually for testing:
+# 
+# kubectl create job deploy-myapp-test \
+#   --image=alpine/helm:3.13.0 \
+#   --namespace=ci-cd \
+#   --serviceaccount=deployment-job \
+#   -- helm upgrade --install myapp ./charts/myapp --namespace production
+# 
+# Follow logs:
+# kubectl logs -n ci-cd job/deploy-myapp-test -f
+# 
+# Check status:
+# kubectl get job -n ci-cd deploy-myapp-test
+# 
+# Cleanup:
+# kubectl delete job -n ci-cd deploy-myapp-test
+# 
+# ==============================================================================
+# Monitoring Deployment Jobs
+# ==============================================================================
+# 
+# List all deployment jobs:
+# kubectl get jobs -n ci-cd -l forge.io/component=deployment
+# 
+# Failed jobs (need attention):
+# kubectl get jobs -n ci-cd --field-selector status.successful=0
+# 
+# Recent deployments:
+# kubectl get jobs -n ci-cd \
+#   -l forge.io/component=deployment \
+#   --sort-by=.metadata.creationTimestamp
+# 
+# Prometheus metrics:
+# kube_job_status_succeeded{namespace="ci-cd"}
+# kube_job_status_failed{namespace="ci-cd"}
+# 
+# ==============================================================================
+# Security Best Practices
+# ==============================================================================
+# 
+# 1. ServiceAccount Scope:
+#    - deployment-job has ClusterRole (can deploy to any namespace)
+#    - For namespace-specific deployments, use Role instead
+# 
+# 2. Audit Trail:
+#    - All Job metadata includes Git commit, branch, triggered-by
+#    - Kubernetes audit logs track all API calls
+#    - Use labels for filtering and reporting
+# 
+# 3. Resource Limits:
+#    - Set CPU/memory limits on deployment containers
+#    - Use activeDeadlineSeconds to prevent hung jobs
+#    - Use ttlSecondsAfterFinished for auto-cleanup
+# 
+# 4. Secret Management:
+#    - Don't pass secrets as env vars
+#    - Use External Secrets Operator
+#    - Mount secrets as volumes with restrictive permissions
+# 
+# 5. RBAC Review:
+#    - Regularly review deployment-job permissions
+#    - Remove unused verbs
+#    - Add namespace restrictions if possible

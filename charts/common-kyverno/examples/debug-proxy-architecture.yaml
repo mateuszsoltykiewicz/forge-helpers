@@ -1,0 +1,457 @@
+# ==============================================================================
+# Best Practice: Controlled Pod Access via Proxy Jobs
+# ==============================================================================
+#
+# Architecture Overview:
+#
+#   ┌─────────┐     kubectl exec    ┌──────────────┐
+#   │  User   │ ───────X────────────│  Target Pod  │  (BLOCKED by Kyverno)
+#   └─────────┘                     └──────────────┘
+#        │
+#        │  kubectl apply debug-job.yaml
+#        │
+#        ▼
+#   ┌─────────────────┐
+#   │  Debug Job/Pod  │  (ServiceAccount with exec privileges)
+#   │  (Proxy Layer)  │
+#   └─────────────────┘
+#        │
+#        │  exec via ServiceAccount
+#        │
+#        ▼
+#   ┌──────────────┐
+#   │  Target Pod  │  (ALLOWED via RBAC exception)
+#   └──────────────┘
+#
+# Benefits:
+#   1. All access is audited (Job creation logged)
+#   2. Time-limited access (Job TTL)
+#   3. RBAC-controlled (who can create debug jobs)
+#   4. Compliance-friendly (audit trail)
+#   5. Break-glass procedure without disabling policies
+#
+# ==============================================================================
+
+kyverno:
+  apiRestrictions:
+    # -------------------------------------------------------------------------
+    # Block ALL direct pod access from users
+    # -------------------------------------------------------------------------
+    blockExec:
+      enabled: true
+      action: enforce
+      severity: high
+      message: |
+        ⛔ Direct kubectl exec is not allowed.
+        
+        Use the debug-proxy job instead:
+        kubectl apply -f debug-job.yaml
+        kubectl logs -f job/debug-<target-pod>
+        
+        Documentation: https://wiki.company.com/kubernetes/debug-proxy
+      
+      # Block in all namespaces
+      includeNamespaces: []  # Empty = all namespaces
+      
+      # IMPORTANT: Exclude the debug-proxy ServiceAccount
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:debug-proxy
+        - system:serviceaccount:*:debug-proxy-*
+      
+      # Exclude cluster admins for break-glass
+      excludeUsers:
+        - cluster-admin
+        - system:masters
+    
+    blockAttach:
+      enabled: true
+      action: enforce
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:debug-proxy
+        - system:serviceaccount:*:debug-proxy-*
+    
+    blockPortForward:
+      enabled: true
+      action: enforce
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:debug-proxy
+    
+    blockProxy:
+      enabled: true
+      action: enforce
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:debug-proxy
+    
+    blockEphemeralContainers:
+      enabled: true
+      action: enforce
+      excludeServiceAccounts:
+        - system:serviceaccount:kube-system:debug-proxy
+
+# ==============================================================================
+# RBAC Configuration for Debug Proxy
+# ==============================================================================
+#
+# Step 1: Create ServiceAccount for debug proxy
+# Step 2: Grant minimal RBAC permissions (pods/exec only)
+# Step 3: Control who can create debug jobs
+#
+# ==============================================================================
+
+---
+# ServiceAccount: debug-proxy
+# Used by debug jobs to exec into target pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: debug-proxy
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: debug-proxy
+    app.kubernetes.io/purpose: controlled-pod-access
+  annotations:
+    description: "ServiceAccount for controlled pod exec access via proxy jobs"
+
+---
+# ClusterRole: debug-proxy-exec
+# Minimal permissions - only pods/exec subresource
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: debug-proxy-exec
+  labels:
+    app.kubernetes.io/name: debug-proxy
+rules:
+  # Allow exec into pods (subresource)
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  
+  # Allow reading pods (to validate target exists)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  
+  # Allow reading pod logs (for debugging)
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+---
+# ClusterRoleBinding: debug-proxy-exec
+# Bind the ClusterRole to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: debug-proxy-exec
+  labels:
+    app.kubernetes.io/name: debug-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: debug-proxy-exec
+subjects:
+  - kind: ServiceAccount
+    name: debug-proxy
+    namespace: kube-system
+
+---
+# ClusterRole: debug-proxy-job-creator
+# Control who can create debug proxy jobs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: debug-proxy-job-creator
+  labels:
+    app.kubernetes.io/name: debug-proxy
+rules:
+  # Allow creating jobs (the proxy mechanism)
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  
+  # Allow reading job logs
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  
+  # Allow listing pods (to find target)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding: allow-sre-team-to-create-debug-jobs
+# Grant SRE team ability to create debug jobs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-team-debug-proxy
+  labels:
+    app.kubernetes.io/name: debug-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: debug-proxy-job-creator
+subjects:
+  # Group: sre-team (from OIDC/LDAP)
+  - kind: Group
+    name: sre-team
+    apiGroup: rbac.authorization.k8s.io
+  
+  # User: oncall-engineer
+  - kind: User
+    name: oncall-engineer
+    apiGroup: rbac.authorization.k8s.io
+
+# ==============================================================================
+# Debug Proxy Job Template
+# ==============================================================================
+#
+# Users create jobs from this template to access pods
+#
+# Usage:
+#   1. Copy this template
+#   2. Replace TARGET_NAMESPACE, TARGET_POD, COMMAND
+#   3. kubectl apply -f debug-job.yaml
+#   4. kubectl logs -f job/debug-myapp-1234
+#
+# ==============================================================================
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: debug-myapp-{{ .Values.debugJob.timestamp | default "1234" }}
+  namespace: {{ .Values.debugJob.namespace | default "default" }}
+  labels:
+    app.kubernetes.io/name: debug-proxy-job
+    debug.forge.io/target-pod: {{ .Values.debugJob.targetPod | required "targetPod required" }}
+    debug.forge.io/created-by: {{ .Values.debugJob.user | required "user required" }}
+  annotations:
+    description: "Controlled pod access via debug proxy"
+    debug.forge.io/reason: {{ .Values.debugJob.reason | required "reason required" | quote }}
+    debug.forge.io/incident: {{ .Values.debugJob.incident | default "none" | quote }}
+spec:
+  # Auto-cleanup after 1 hour
+  ttlSecondsAfterFinished: 3600
+  
+  # Limit to 10 minutes
+  activeDeadlineSeconds: 600
+  
+  # Don't retry on failure
+  backoffLimit: 0
+  
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: debug-proxy-job
+    spec:
+      # Use the privileged ServiceAccount
+      serviceAccountName: debug-proxy
+      
+      # Don't restart on completion
+      restartPolicy: Never
+      
+      containers:
+        - name: debug-exec
+          image: {{ .Values.debugJob.image | default "bitnami/kubectl:1.29" }}
+          
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              # Configuration
+              TARGET_NAMESPACE="{{ .Values.debugJob.targetNamespace | required "targetNamespace required" }}"
+              TARGET_POD="{{ .Values.debugJob.targetPod | required "targetPod required" }}"
+              TARGET_CONTAINER="{{ .Values.debugJob.targetContainer | default "" }}"
+              COMMAND="{{ .Values.debugJob.command | default "/bin/sh" }}"
+              
+              echo "=============================================="
+              echo "Debug Proxy Job"
+              echo "=============================================="
+              echo "Target: $TARGET_NAMESPACE/$TARGET_POD"
+              echo "Container: ${TARGET_CONTAINER:-default}"
+              echo "Command: $COMMAND"
+              echo "User: {{ .Values.debugJob.user }}"
+              echo "Reason: {{ .Values.debugJob.reason }}"
+              echo "Incident: {{ .Values.debugJob.incident | default "none" }}"
+              echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "=============================================="
+              echo ""
+              
+              # Verify target pod exists
+              if ! kubectl get pod "$TARGET_POD" -n "$TARGET_NAMESPACE" &>/dev/null; then
+                echo "ERROR: Pod $TARGET_POD not found in namespace $TARGET_NAMESPACE"
+                exit 1
+              fi
+              
+              # Build kubectl exec command
+              KUBECTL_CMD="kubectl exec -n $TARGET_NAMESPACE"
+              
+              if [ -n "$TARGET_CONTAINER" ]; then
+                KUBECTL_CMD="$KUBECTL_CMD -c $TARGET_CONTAINER"
+              fi
+              
+              KUBECTL_CMD="$KUBECTL_CMD $TARGET_POD -- $COMMAND"
+              
+              # Execute command in target pod
+              echo "Executing: $KUBECTL_CMD"
+              echo ""
+              
+              eval "$KUBECTL_CMD"
+              
+              EXIT_CODE=$?
+              
+              echo ""
+              echo "=============================================="
+              echo "Exit code: $EXIT_CODE"
+              echo "Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "=============================================="
+              
+              exit $EXIT_CODE
+          
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+
+# ==============================================================================
+# Example Values for Debug Job
+# ==============================================================================
+#
+# Save as: debug-values.yaml
+#
+# Usage:
+#   helm template . -f debug-values.yaml | kubectl apply -f -
+#
+# ==============================================================================
+
+debugJob:
+  # Required: Timestamp for unique job name
+  timestamp: "20260221-143022"
+  
+  # Required: Namespace where job will be created
+  namespace: "default"
+  
+  # Required: Target pod to debug
+  targetPod: "myapp-deployment-abc123"
+  
+  # Required: Target namespace
+  targetNamespace: "production"
+  
+  # Optional: Target container (if pod has multiple)
+  targetContainer: ""
+  
+  # Optional: Command to execute (default: /bin/sh)
+  command: "/bin/sh -c 'ps aux; netstat -tulpn'"
+  
+  # Required: User creating the job (for audit)
+  user: "john.doe@company.com"
+  
+  # Required: Reason for access (for audit)
+  reason: "Investigating high memory usage in production pod"
+  
+  # Optional: Incident ticket (for audit)
+  incident: "INC-12345"
+  
+  # Optional: Custom image (default: bitnami/kubectl)
+  image: "bitnami/kubectl:1.29"
+
+# ==============================================================================
+# Alternative: Interactive Debug Pod (for longer sessions)
+# ==============================================================================
+#
+# For debugging sessions that require interaction, use a Pod instead of Job
+#
+# ==============================================================================
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-session-{{ .Values.debugSession.timestamp | default "1234" }}
+  namespace: {{ .Values.debugSession.namespace | default "default" }}
+  labels:
+    app.kubernetes.io/name: debug-proxy-pod
+    debug.forge.io/target-namespace: {{ .Values.debugSession.targetNamespace }}
+    debug.forge.io/created-by: {{ .Values.debugSession.user }}
+spec:
+  serviceAccountName: debug-proxy
+  restartPolicy: Never
+  
+  # Auto-terminate after 30 minutes
+  activeDeadlineSeconds: 1800
+  
+  containers:
+    - name: debug-shell
+      image: {{ .Values.debugSession.image | default "nicolaka/netshoot:latest" }}
+      
+      command:
+        - /bin/bash
+      
+      stdin: true
+      tty: true
+      
+      env:
+        - name: TARGET_NAMESPACE
+          value: {{ .Values.debugSession.targetNamespace | required "targetNamespace required" | quote }}
+        - name: TARGET_POD
+          value: {{ .Values.debugSession.targetPod | default "" | quote }}
+        - name: DEBUG_USER
+          value: {{ .Values.debugSession.user | required "user required" | quote }}
+      
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+# Usage for interactive session:
+#   1. Create pod: helm template . -f debug-session-values.yaml | kubectl apply -f -
+#   2. Attach to pod: kubectl attach -it debug-session-1234
+#   3. Inside pod: kubectl exec -n production myapp-pod -- /bin/sh
+#   4. Cleanup: kubectl delete pod debug-session-1234
+
+# ==============================================================================
+# Monitoring and Auditing
+# ==============================================================================
+#
+# 1. Audit Logs:
+#    All debug job creations are logged in Kubernetes audit logs
+#
+# 2. Prometheus Metrics:
+#    Count debug jobs created:
+#    kube_job_created{job=~"debug-.*"}
+#
+# 3. Alert on excessive debug jobs:
+#    - alert: HighDebugJobUsage
+#      expr: |
+#        sum(rate(kube_job_created{job=~"debug-.*"}[1h])) > 10
+#      annotations:
+#        summary: "High number of debug jobs created"
+#
+# 4. SIEM Export:
+#    Export job metadata to SIEM:
+#    - User (debug.forge.io/created-by)
+#    - Target (debug.forge.io/target-pod)
+#    - Reason (annotation)
+#    - Incident (annotation)
+#
+# ==============================================================================

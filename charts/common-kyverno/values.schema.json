@@ -1,0 +1,289 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forge Common Kyverno Configuration",
+  "description": "Kyverno policy governance for Kubernetes",
+  "type": "object",
+  "properties": {
+    "kyverno": {
+      "type": "object",
+      "properties": {
+        "clusterpolicy": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "title": {"type": "string"},
+            "category": {"type": "string"},
+            "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+            "description": {"type": "string"},
+            "validationFailureAction": {"type": "string", "enum": ["audit", "enforce"]},
+            "background": {"type": "boolean"},
+            "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+            "webhookTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "rules": {"type": "array"},
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "title": {"type": "string"},
+            "category": {"type": "string"},
+            "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+            "description": {"type": "string"},
+            "validationFailureAction": {"type": "string", "enum": ["audit", "enforce"]},
+            "background": {"type": "boolean"},
+            "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+            "webhookTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "rules": {"type": "array"},
+            "labels": {"type": "object"},
+            "annotations": {"type": "object"}
+          }
+        },
+        "policies": {
+          "type": "object",
+          "properties": {
+            "requireNonRoot": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "disallowPrivileged": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "requireResourceLimits": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "requireReadOnlyRoot": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "requireForgeLabels": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "disallowLatestTag": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]}
+              }
+            },
+            "addDefaultNetworkPolicy": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"}
+              }
+            }
+          }
+        },
+        "environments": {
+          "type": "object",
+          "properties": {
+            "development": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "production": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"}
+              }
+            }
+          }
+        },
+        "mutations": {
+          "type": "object",
+          "properties": {
+            "addMonitoringAnnotations": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"}
+              }
+            }
+          }
+        },
+        "apiRestrictions": {
+          "type": "object",
+          "properties": {
+            "blockExec": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "includeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockAttach": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "includeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockPortForward": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "includeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockProxy": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "includeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockEphemeralContainers": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "includeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            }
+          }
+        },
+        "resourceManagement": {
+          "type": "object",
+          "properties": {
+            "blockWorkloadModifications": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockNetworkingModifications": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockConfigModifications": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockStorageModifications": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            },
+            "blockRBACModifications": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "action": {"type": "string", "enum": ["audit", "enforce"]},
+                "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "failurePolicy": {"type": "string", "enum": ["Fail", "Ignore"]},
+                "message": {"type": "string"},
+                "excludeNamespaces": {"type": "array", "items": {"type": "string"}},
+                "excludeServiceAccounts": {"type": "array", "items": {"type": "string"}},
+                "excludeUsers": {"type": "array", "items": {"type": "string"}},
+                "annotations": {"type": "object"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "labels": {"type": "object"},
+    "annotations": {"type": "object"}
+  }
+}
