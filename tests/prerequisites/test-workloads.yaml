@@ -1,0 +1,290 @@
+---
+# Simple nginx deployment for testing policies
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-nginx
+  namespace: test-app
+  labels:
+    app: test-nginx
+    testing: "true"
+  annotations:
+    description: "Simple nginx deployment for basic policy testing"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-nginx
+  template:
+    metadata:
+      labels:
+        app: test-nginx
+        testing: "true"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+# Service for test-nginx
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-nginx
+  namespace: test-app
+  labels:
+    app: test-nginx
+    testing: "true"
+spec:
+  selector:
+    app: test-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  type: ClusterIP
+
+---
+# CrashLoop pod for monitoring tests
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-test
+  namespace: test-app
+  labels:
+    app: crashloop-test
+    testing: "true"
+  annotations:
+    description: "Pod that crashes repeatedly for testing monitoring alerts"
+spec:
+  restartPolicy: Always
+  containers:
+    - name: crash
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'Crashing...'; sleep 2; exit 1"]
+
+---
+# Slow response pod for SLO testing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slow-app
+  namespace: test-app
+  labels:
+    app: slow-app
+    testing: "true"
+  annotations:
+    description: "Application with slow responses for SLO testing"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slow-app
+  template:
+    metadata:
+      labels:
+        app: slow-app
+    spec:
+      containers:
+        - name: slow-app
+          image: hashicorp/http-echo:latest
+          args:
+            - "-text=Slow response (simulated)"
+            - "-listen=:8080"
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          # Simulate slow responses by throttling CPU
+          env:
+            - name: SLOW_MODE
+              value: "true"
+
+---
+# Service for slow-app
+apiVersion: v1
+kind: Service
+metadata:
+  name: slow-app
+  namespace: test-app
+  labels:
+    app: slow-app
+spec:
+  selector:
+    app: slow-app
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+
+---
+# High CPU pod for autoscaling tests
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-stress
+  namespace: test-app
+  labels:
+    app: cpu-stress
+    testing: "true"
+  annotations:
+    description: "CPU-intensive workload for autoscaling testing"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-stress
+  template:
+    metadata:
+      labels:
+        app: cpu-stress
+    spec:
+      containers:
+        - name: stress
+          image: polinux/stress:latest
+          command: ["stress"]
+          args:
+            - "--cpu"
+            - "1"
+            - "--timeout"
+            - "3600s"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+
+---
+# Vulnerable image for security scanning tests
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-app
+  namespace: test-app
+  labels:
+    app: vulnerable-app
+    testing: "true"
+  annotations:
+    description: "Deployment with known vulnerabilities for Trivy testing"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-app
+  template:
+    metadata:
+      labels:
+        app: vulnerable-app
+    spec:
+      containers:
+        - name: vulnerable
+          image: nginx:1.14.0  # Old version with CVEs
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+---
+# Pod with secrets in environment (for secret scanning)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-leak-test
+  namespace: test-app
+  labels:
+    app: secret-leak-test
+    testing: "true"
+  annotations:
+    description: "Pod with hardcoded secrets for secret detection testing"
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'Running...'; sleep 3600"]
+      env:
+        - name: API_KEY
+          value: "hardcoded-api-key-12345"
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        - name: DATABASE_PASSWORD
+          value: "SuperSecretPassword123!"
+
+---
+# ConfigMap for testing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+  namespace: test-app
+  labels:
+    testing: "true"
+data:
+  app.properties: |
+    environment=test
+    log_level=debug
+    feature_flag=enabled
+  
+  config.json: |
+    {
+      "database": {
+        "host": "localhost",
+        "port": 5432
+      },
+      "cache": {
+        "enabled": true,
+        "ttl": 3600
+      }
+    }
+
+---
+# Secret for testing
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret
+  namespace: test-app
+  labels:
+    testing: "true"
+type: Opaque
+stringData:
+  username: testuser
+  password: testpassword123
+  api-token: dGVzdC10b2tlbi0xMjM0NQ==

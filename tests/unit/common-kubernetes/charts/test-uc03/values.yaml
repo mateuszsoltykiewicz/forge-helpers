@@ -1,0 +1,568 @@
+# ==============================================================================
+# Forge Common Library - common-kubernetes values.yaml
+# ==============================================================================
+# Comprehensive Kubernetes resource configuration with Vault integration.
+# See README.md for full documentation and examples.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# WORKLOAD RESOURCES
+# ------------------------------------------------------------------------------
+
+# Deployment configuration
+deployment:
+  enabled: false
+  nameOverride: ""
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 0
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+  
+  # Pod template
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerName: ""
+  securityContext: {}
+  command: []
+  args: []
+  
+  ports: []
+  # - name: http
+  #   containerPort: 8080
+  #   protocol: TCP
+  
+  env: []
+  envFrom: []
+  
+  # Health probes
+  startupProbe: {}
+  livenessProbe: {}
+  readinessProbe: {}
+  lifecycle: {}
+  
+  resources: {}
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # limits:
+  #   cpu: 500m
+  #   memory: 512Mi
+  
+  volumeMounts: []
+  volumes: []
+  
+  # Init containers
+  initContainers: []
+  waitForDatabase:
+    enabled: false
+    timeout: 60
+    image: postgres:16-alpine
+    resources: {}
+  
+  # Sidecars
+  sidecars: []
+  
+  # Scheduling
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  
+  # Advanced
+  hostNetwork: false
+  dnsPolicy: ""
+  dnsConfig: {}
+  hostname: ""
+  subdomain: ""
+  terminationGracePeriodSeconds: 30
+  activeDeadlineSeconds: null
+  enableServiceLinks: true
+  shareProcessNamespace: false
+
+# StatefulSet configuration
+statefulset:
+  enabled: false
+  nameOverride: ""
+  serviceName: ""  # REQUIRED if enabled
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
+  minReadySeconds: 0
+  
+  # Pod template (same structure as deployment)
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerName: ""
+  securityContext: {}
+  command: []
+  args: []
+  ports: []
+  env: []
+  envFrom: []
+  startupProbe: {}
+  livenessProbe: {}
+  readinessProbe: {}
+  lifecycle: {}
+  resources: {}
+  volumeMounts: []
+  volumes: []
+  initContainers: []
+  sidecars: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  terminationGracePeriodSeconds: 30
+  
+  # Persistent volume claims
+  volumeClaimTemplates: []
+  # - name: data
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   storageClassName: gp3
+  #   size: 10Gi
+
+# DaemonSet configuration
+daemonset:
+  enabled: false
+  nameOverride: ""
+  updateStrategy:
+    type: RollingUpdate
+  minReadySeconds: 0
+  revisionHistoryLimit: 10
+  
+  # Pod template
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerName: ""
+  securityContext: {}
+  command: []
+  args: []
+  ports: []
+  env: []
+  resources: {}
+  volumeMounts: []
+  volumes: []
+  initContainers: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  priorityClassName: ""
+  terminationGracePeriodSeconds: 30
+  
+  # Host networking
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false
+
+# Job configuration
+job:
+  enabled: false
+  nameOverride: ""
+  backoffLimit: 6
+  completions: 1
+  parallelism: 1
+  activeDeadlineSeconds: null
+  ttlSecondsAfterFinished: null
+  restartPolicy: OnFailure
+  
+  # Pod template
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerName: ""
+  securityContext: {}
+  command: []
+  args: []
+  env: []
+  resources: {}
+  volumeMounts: []
+  volumes: []
+  initContainers: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+
+# CronJob configuration
+cronjob:
+  enabled: false
+  nameOverride: ""
+  schedule: "0 0 * * *"  # Default: midnight daily (required by schema)
+  timeZone: ""
+  concurrencyPolicy: Allow
+  suspend: false
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: null
+  backoffLimit: 6
+  ttlSecondsAfterFinished: null
+  restartPolicy: OnFailure
+  
+  # Pod template
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerName: ""
+  securityContext: {}
+  command: []
+  args: []
+  env: []
+  resources: {}
+  volumeMounts: []
+  volumes: []
+  initContainers: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+
+# ------------------------------------------------------------------------------
+# SERVICE & NETWORKING
+# ------------------------------------------------------------------------------
+
+# Service configuration
+service:
+  enabled: false
+  nameOverride: ""
+  type: ClusterIP
+  clusterIP: ""
+  externalIPs: []
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  externalName: ""
+  externalTrafficPolicy: ""
+  sessionAffinity: ""
+  sessionAffinityConfig: {}
+  publishNotReadyAddresses: false
+  annotations: {}
+  
+  ports: []
+  # - name: http
+  #   port: 80
+  #   targetPort: 8080
+  #   protocol: TCP
+  
+  # Headless service (for StatefulSets)
+  headless:
+    enabled: false
+    nameOverride: ""
+    publishNotReadyAddresses: false
+    annotations: {}
+    ports: []
+
+# Ingress configuration
+ingress:
+  enabled: false
+  nameOverride: ""
+  ingressClassName: ""
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # cert-manager.io/cluster-issuer: letsencrypt-prod
+  
+  tls: []
+  # - hosts:
+  #     - example.com
+  #   secretName: example-tls
+  
+  rules: []
+  # - host: example.com
+  #   paths:
+  #     - path: /
+  #       pathType: Prefix
+  #       serviceName: my-service
+  #       servicePort: 80
+
+# NetworkPolicy configuration
+networkPolicy:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  podSelector: {}  # Default: use forge.selectorLabels
+  
+  ingress: []
+  # - from:
+  #     - namespaceSelector:
+  #         matchLabels:
+  #           name: production
+  #   ports:
+  #     - protocol: TCP
+  #       port: 8080
+  
+  egress: []
+  # - to:
+  #     - namespaceSelector: {}
+  #   ports:
+  #     - protocol: TCP
+  #       port: 443
+
+# ------------------------------------------------------------------------------
+# CONFIG & STORAGE
+# ------------------------------------------------------------------------------
+
+# ConfigMap configuration
+configMap:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  immutable: false
+  data: {}
+  # application.yaml: |
+  #   server:
+  #     port: 8080
+  binaryData: {}
+
+# Secret configuration (NOT for Vault-managed secrets)
+secret:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  type: Opaque
+  immutable: false
+  stringData: {}
+  # username: admin
+  data: {}
+  # password: cGFzc3dvcmQ=
+
+# PersistentVolumeClaim configuration
+pvc:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  size: "1Gi"  # Default: 1Gi (required by schema)
+  volumeMode: Filesystem
+  selector: {}
+  dataSource: {}
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: true
+  imagePullSecrets: []
+  secrets: []
+  
+  # Cloud provider workload identity
+  awsRoleArn: ""        # AWS IRSA (populated by common-aws)
+  azureClientId: ""     # Azure Workload Identity
+  gcpServiceAccount: "" # GCP Workload Identity
+
+# RBAC configuration
+rbac:
+  create: false
+  
+  roles: []
+  # - name: app-reader
+  #   namespace: default
+  #   rules:
+  #     - apiGroups: [""]
+  #       resources: ["pods"]
+  #       verbs: ["get", "list"]
+  
+  roleBindings: []
+  # - name: app-reader-binding
+  #   roleName: app-reader
+  #   subjects:
+  #     - kind: ServiceAccount
+  #       name: my-app
+  
+  clusterRoles: []
+  clusterRoleBindings: []
+
+# ------------------------------------------------------------------------------
+# AUTOSCALING & AVAILABILITY
+# ------------------------------------------------------------------------------
+
+# HorizontalPodAutoscaler configuration
+autoscaling:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  targetKind: Deployment
+  targetName: ""
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: null
+  customMetrics: []
+  behavior: {}
+
+# VerticalPodAutoscaler configuration
+vpa:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  targetKind: Deployment
+  targetName: ""
+  updatePolicy: {}
+  # updateMode: Auto
+  resourcePolicy: {}
+
+# PodDisruptionBudget configuration
+pdb:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  minAvailable: null
+  maxUnavailable: 1
+  unhealthyPodEvictionPolicy: null
+
+# ------------------------------------------------------------------------------
+# MONITORING
+# ------------------------------------------------------------------------------
+
+# PodMonitor configuration (Prometheus Operator)
+podMonitor:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  namespaceSelector: {}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+
+# ServiceMonitor configuration (Prometheus Operator)
+serviceMonitor:
+  enabled: false
+  nameOverride: ""
+  annotations: {}
+  namespaceSelector: {}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+
+# ------------------------------------------------------------------------------
+# COMMON CONFIGURATION (from common-forge)
+# ------------------------------------------------------------------------------
+
+# Image configuration
+image:
+  registry: ""
+  repository: ""
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Naming configuration (forge.* functions)
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace configuration
+namespaceOverride: ""
+
+# Labels configuration
+labels:
+  app: ""
+  component: ""
+  partOf: ""
+  version: ""
+  managedBy: "Helm"
+  customer: ""
+  project: ""
+  environment: ""
+  additionalLabels: {}
+
+# ------------------------------------------------------------------------------
+# VAULT INTEGRATION (from common-vault)
+# ------------------------------------------------------------------------------
+
+vault:
+  enabled: false
+  
+  # Agent configuration
+  agent:
+    enabled: true
+    role: ""  # Default: forge.fullname
+    prePopulate: true
+    prePopulateOnly: false
+  
+  # Resources
+  resources:
+    agent:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    init:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  
+  # Cache configuration
+  cache:
+    enabled: false
+    persist: false
+    size: 10000
+  
+  # TLS configuration
+  tls:
+    enabled: false
+    caCert: ""
+    clientCert: ""
+    clientKey: ""
+    serverName: ""
+    skipVerify: false
+  
+  # Authentication
+  auth:
+    method: kubernetes
+    path: ""
+    jwt: ""
+    aws:
+      role: ""
+      region: ""
+      headerValue: ""
+    azure:
+      role: ""
+      resource: ""
+    gcp:
+      role: ""
+      serviceAccount: ""
+  
+  # Service configuration
+  service:
+    address: ""
+    namespace: ""
+  
+  # Logging
+  log:
+    level: info
+    format: standard
+  
+  # Security context
+  runAs:
+    user: null
+    group: null
+    sameAsContainer: false
+  
+  # Sections (secret organization)
+  sections: []
+  # - app: "secret/data/customer/project/app/config"
+  # - database: "secret/data/customer/project/app/database"
+  
+  # Variable verification
+  verification:
+    enabled: true
+    mode: verbose  # verbose | minimal | silent
+    required: []
+    # - APP_NAME
+    # - DATABASE_URL
+    optional: []
+    defaults: {}

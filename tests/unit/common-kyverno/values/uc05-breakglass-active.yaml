@@ -1,0 +1,85 @@
+# UC-KYVERNO-05: Break-Glass Procedure - Active State (Emergency Access Granted)
+# User temporarily added to excludeUsers for emergency operations
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "production"
+  application: "breakglass-test"
+
+kyverno:
+  # API Restrictions - User added to exclusions (BREAK-GLASS ACTIVE)
+  apiRestrictions:
+    blockExec:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      message: >-
+        kubectl exec is blocked in production.
+        Break-glass access currently active.
+      excludeUsers:
+        # Break-glass user granted temporary access
+        - "system:serviceaccount:kube-system:admin"
+        # For real user: "admin@company.com"
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "active"
+        granted-at: "2026-02-21T10:30:00Z"
+        granted-by: "platform-team"
+        incident-id: "INC-1234"
+        reason: "Critical production incident - API 500 errors"
+        duration-limit: "30 minutes"
+    
+    blockPortForward:
+      enabled: true
+      action: "enforce"
+      excludeUsers:
+        - "system:serviceaccount:kube-system:admin"
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "active"
+    
+    blockProxy:
+      enabled: true
+      action: "enforce"
+      excludeUsers:
+        - "system:serviceaccount:kube-system:admin"
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "active"
+  
+  # Resource Management - User added to exclusions (BREAK-GLASS ACTIVE)
+  resourceManagement:
+    blockWorkloadModifications:
+      enabled: true
+      action: "enforce"
+      severity: "high"
+      message: >-
+        Direct workload modifications blocked.
+        Break-glass access currently active.
+      excludeUsers:
+        # Break-glass user granted temporary access
+        - "system:serviceaccount:kube-system:admin"
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "active"
+        granted-at: "2026-02-21T10:30:00Z"
+        incident-id: "INC-1234"
+        approved-by: "platform-lead@company.com"
+  
+  # Debug proxy disabled
+  debugProxy:
+    enabled: false

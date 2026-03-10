@@ -1,0 +1,206 @@
+# UC-KUBERNETES-01: Deployment with Horizontal Pod Autoscaler
+#
+# Tests deployment creation with automatic scaling based on CPU/memory metrics.
+# Validates HPA configuration, metrics collection, and scale up/down behavior.
+
+# Deployment Configuration
+deployment:
+  enabled: true
+  name: hpa-test-app
+  replicaCount: 1  # Start with 1 replica, HPA will adjust
+  
+  image:
+    repository: nginx
+    tag: "1.25.3"
+    pullPolicy: IfNotPresent
+  
+  # Resource requests/limits are CRITICAL for HPA to function
+  resources:
+    requests:
+      cpu: 100m        # HPA uses this as 100% baseline
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  # Container port
+  containerPort: 80
+  
+  # Liveness probe
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Readiness probe
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Environment variables (optional)
+  env:
+    - name: APP_NAME
+      value: "hpa-test-app"
+    - name: ENVIRONMENT
+      value: "test"
+  
+  # Labels
+  labels:
+    app: hpa-test-app
+    component: web
+    test-case: uc01
+  
+  # Annotations
+  annotations:
+    description: "Test deployment for HPA validation"
+    test-case: "UC-KUBERNETES-01"
+
+# Horizontal Pod Autoscaler Configuration
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  
+  # CPU-based scaling
+  targetCPUUtilizationPercentage: 50  # Scale when CPU > 50%
+  
+  # Memory-based scaling (optional)
+  targetMemoryUtilizationPercentage: 70  # Scale when memory > 70%
+  
+  # Behavior configuration (scale up/down policies)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60  # Wait 60s before scaling up again
+      policies:
+      - type: Pods
+        value: 2                      # Add max 2 pods at a time
+        periodSeconds: 60
+      - type: Percent
+        value: 50                     # Or 50% of current pods
+        periodSeconds: 60
+      selectPolicy: Max              # Use the policy that adds more pods
+    
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 minutes before scaling down
+      policies:
+      - type: Pods
+        value: 1                       # Remove max 1 pod at a time
+        periodSeconds: 60
+      - type: Percent
+        value: 10                      # Or 10% of current pods
+        periodSeconds: 60
+      selectPolicy: Min               # Use the policy that removes fewer pods
+  
+  # Annotations
+  annotations:
+    description: "HPA for uc01 deployment test"
+
+# Service Configuration (needed for load testing)
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+  
+  labels:
+    app: hpa-test-app
+  
+  annotations:
+    description: "Service for HPA test application"
+
+# ServiceMonitor (optional - for Prometheus metrics)
+serviceMonitor:
+  enabled: false  # Enable if Prometheus Operator is available
+  interval: 30s
+  scrapeTimeout: 10s
+
+# Metrics Server (must be installed in cluster)
+# kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+metricsServer:
+  enabled: true
+  # For minikube/kind: disable TLS verification
+  insecureSkipTLSVerify: true
+  hostNetworkMode: false
+
+# Pod Disruption Budget (optional - good practice with HPA)
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1  # Keep at least 1 pod running during disruptions
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101  # nginx user
+  fsGroup: 101
+  
+  capabilities:
+    drop:
+      - ALL
+  
+  readOnlyRootFilesystem: false  # nginx needs to write logs
+
+# Node Selector (optional)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []
+
+# Affinity (optional - for multi-node testing)
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - hpa-test-app
+        topologyKey: kubernetes.io/hostname
+
+# Real-World HPA Configuration Examples:
+#
+# 1. Web Application (CPU-focused):
+#    hpa:
+#      targetCPUUtilizationPercentage: 70
+#      targetMemoryUtilizationPercentage: 80
+#      minReplicas: 3
+#      maxReplicas: 20
+#
+# 2. API Service (Memory-focused):
+#    hpa:
+#      targetCPUUtilizationPercentage: 60
+#      targetMemoryUtilizationPercentage: 75
+#      minReplicas: 2
+#      maxReplicas: 10
+#
+# 3. Background Worker (Conservative scaling):
+#    hpa:
+#      targetCPUUtilizationPercentage: 80
+#      minReplicas: 1
+#      maxReplicas: 5
+#      behavior:
+#        scaleDown:
+#          stabilizationWindowSeconds: 600  # 10 minutes
+#
+# 4. Custom Metrics (requires metrics adapter):
+#    hpa:
+#      metrics:
+#      - type: Pods
+#        pods:
+#          metric:
+#            name: http_requests_per_second
+#          target:
+#            type: AverageValue
+#            averageValue: "1000"

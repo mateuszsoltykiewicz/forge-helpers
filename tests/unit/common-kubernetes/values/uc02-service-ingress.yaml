@@ -1,0 +1,210 @@
+# UC-KUBERNETES-02: Service + Ingress Configuration
+#
+# Tests service exposure and ingress routing for applications.
+# Validates ClusterIP, NodePort, LoadBalancer services and Ingress rules.
+
+# Application Deployment
+deployment:
+  enabled: true
+  name: web-app
+  replicaCount: 2
+  
+  image:
+    repository: nginxdemos/hello
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  containerPort: 80
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# ClusterIP Service (internal access only)
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+  
+  # Additional ports (optional)
+  additionalPorts: []
+  # - name: metrics
+  #   port: 9090
+  #   targetPort: 9090
+  
+  # Session affinity (optional)
+  sessionAffinity: None  # or ClientIP
+  sessionAffinityConfig: {}
+  
+  labels:
+    app: web-app
+    component: service
+  
+  annotations:
+    description: "ClusterIP service for web application"
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx  # nginx, traefik, alb, etc.
+  
+  annotations:
+    # NGINX specific
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    
+    # Rate limiting (optional)
+    # nginx.ingress.kubernetes.io/limit-rps: "10"
+    
+    # CORS (optional)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  
+  hosts:
+    - host: web-app.local
+      paths:
+        - path: /
+          pathType: Prefix
+    
+    # Additional hosts/paths
+    # - host: api.local
+    #   paths:
+    #     - path: /api
+    #       pathType: Prefix
+  
+  # TLS configuration (optional)
+  tls: []
+  # - secretName: web-app-tls
+  #   hosts:
+  #     - web-app.local
+
+# NodePort Service (for testing without Ingress)
+nodePortService:
+  enabled: false
+  type: NodePort
+  port: 80
+  targetPort: 80
+  nodePort: 30080  # 30000-32767
+
+# LoadBalancer Service (for cloud environments)
+loadBalancerService:
+  enabled: false
+  type: LoadBalancer
+  port: 80
+  targetPort: 80
+  
+  # Cloud-specific annotations
+  annotations: {}
+  # AWS
+  # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+  # service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  
+  # GCP
+  # cloud.google.com/load-balancer-type: "Internal"
+  
+  # Azure
+  # service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+
+# Service Monitor (for Prometheus)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics
+  port: metrics
+
+# Network Policy (optional)
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 80
+  
+  egress:
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 53  # DNS
+
+# Real-World Examples:
+#
+# 1. Public Web Application:
+#    ingress:
+#      className: nginx
+#      hosts:
+#        - host: example.com
+#          paths:
+#            - path: /
+#              pathType: Prefix
+#      tls:
+#        - secretName: example-com-tls
+#          hosts:
+#            - example.com
+#      annotations:
+#        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#        nginx.ingress.kubernetes.io/limit-rps: "100"
+#
+# 2. API Gateway:
+#    ingress:
+#      hosts:
+#        - host: api.example.com
+#          paths:
+#            - path: /v1/users
+#              pathType: Prefix
+#            - path: /v1/orders
+#              pathType: Prefix
+#      annotations:
+#        nginx.ingress.kubernetes.io/rate-limit: "100"
+#        nginx.ingress.kubernetes.io/enable-cors: "true"
+#
+# 3. Internal Service (no Ingress):
+#    service:
+#      type: ClusterIP
+#      port: 8080
+#    ingress:
+#      enabled: false
+#
+# 4. Multi-Port Service:
+#    service:
+#      port: 80
+#      additionalPorts:
+#        - name: grpc
+#          port: 9000
+#          targetPort: 9000
+#        - name: metrics
+#          port: 9090
+#          targetPort: 9090

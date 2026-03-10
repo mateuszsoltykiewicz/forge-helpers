@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rbac-tester
+  labels:
+    app: rbac-tester
+spec:
+  serviceAccountName: rbac-test-sa
+  restartPolicy: Never
+  containers:
+  - name: tester
+    image: bitnami/kubectl:1.28
+    command:
+    - /bin/sh
+    - -c
+    - |
+      echo "=== RBAC Permission Tests ==="
+      PASSED=0
+      FAILED=0
+      
+      # Test 1: List pods (should work)
+      if kubectl get pods &> /dev/null; then
+        echo "✅ Can list pods"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ Cannot list pods"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      # Test 2: List nodes (ClusterRole, should work)
+      if kubectl get nodes &> /dev/null; then
+        echo "✅ Can list nodes (ClusterRole)"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ Cannot list nodes"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      # Test 3: Delete pods (should fail)
+      if kubectl auth can-i delete pods 2>&1 | grep -q "no"; then
+        echo "✅ Cannot delete pods (correct)"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ Can delete pods (should be denied)"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      # Test 4: Create deployments (should fail)
+      if kubectl auth can-i create deployments 2>&1 | grep -q "no"; then
+        echo "✅ Cannot create deployments (correct)"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ Can create deployments (should be denied)"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      echo ""
+      echo "Summary: $PASSED passed, $FAILED failed"
+      [ $FAILED -eq 0 ] || exit 1

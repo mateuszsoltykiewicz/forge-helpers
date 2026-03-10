@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-test
+  labels:
+    app: crashloop-test
+    test: availability
+spec:
+  restartPolicy: Always
+  containers:
+  - name: crash
+    image: busybox:latest
+    command: ["sh", "-c", "echo 'Simulating crash' && exit 1"]
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "50m"
+      limits:
+        memory: "64Mi"
+        cpu: "100m"

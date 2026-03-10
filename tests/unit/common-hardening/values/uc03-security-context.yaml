@@ -1,0 +1,125 @@
+# UC-HARDENING-03: Security Contexts and Capabilities
+#
+# Tests comprehensive security context configuration
+
+deployment:
+  enabled: true
+  name: secure-app
+  replicas: 1
+  
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  
+  # Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101  # nginx user
+    runAsGroup: 101
+    fsGroup: 101
+    fsGroupChangePolicy: "OnRootMismatch"
+    
+    # Seccomp profile (restricts syscalls)
+    seccompProfile:
+      type: RuntimeDefault
+    
+    # SELinux options (if enabled)
+    seLinuxOptions: {}
+    
+    # Supplemental groups
+    supplementalGroups: []
+  
+  # Container-level security context
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    
+    # Prevent privilege escalation
+    allowPrivilegeEscalation: false
+    
+    # Drop all capabilities, add only required
+    capabilities:
+      drop:
+        - ALL
+      add: []  # No capabilities needed for nginx
+    
+    # Read-only root filesystem
+    readOnlyRootFilesystem: false  # nginx needs /var/cache/nginx
+    
+    # Privileged mode (should always be false)
+    privileged: false
+    
+    # Seccomp profile
+    seccompProfile:
+      type: RuntimeDefault
+    
+    # Proc mount type
+    procMount: Default
+  
+  # Volume mounts with read-only
+  volumeMounts:
+    - name: cache
+      mountPath: /var/cache/nginx
+    - name: run
+      mountPath: /var/run
+    - name: config
+      mountPath: /etc/nginx/nginx.conf
+      subPath: nginx.conf
+      readOnly: true
+  
+  volumes:
+    - name: cache
+      emptyDir: {}
+    - name: run
+      emptyDir: {}
+    - name: config
+      configMap:
+        name: nginx-config
+  
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# ConfigMap for nginx config
+configMap:
+  enabled: true
+  name: nginx-config
+  data:
+    nginx.conf: |
+      user nginx;
+      worker_processes 1;
+      error_log /dev/stderr warn;
+      pid /var/run/nginx.pid;
+      
+      events {
+        worker_connections 1024;
+      }
+      
+      http {
+        access_log /dev/stdout;
+        server {
+          listen 8080;
+          location / {
+            return 200 "Secure nginx";
+          }
+        }
+      }
+
+# Security validation tests
+securityTests:
+  - name: "Non-root user"
+    command: "id -u"
+    expectedOutput: "101"
+  
+  - name: "No privilege escalation"
+    command: "cat /proc/self/status | grep NoNewPrivs"
+    expectedOutput: "1"
+  
+  - name: "Capabilities dropped"
+    command: "cat /proc/self/status | grep CapEff"
+    expectedOutput: "0000000000000000"

@@ -1,0 +1,48 @@
+# UC02: ALB Ingress with AWS Load Balancer Controller
+# Tests Application Load Balancer provisioning via Kubernetes Ingress
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/success-codes: "200"
+    alb.ingress.kubernetes.io/tags: Environment=test,ManagedBy=kubernetes
+  hosts:
+    - host: test-app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+service:
+  enabled: true
+  name: alb-test-service
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+deployment:
+  enabled: true
+  name: alb-test-app
+  image: nginx:1.25-alpine
+  replicas: 2
+  containerPort: 8080
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 5

@@ -1,0 +1,269 @@
+# Load Generator for HPA Testing
+#
+# This pod generates CPU load to trigger HPA scaling behavior.
+# Useful for testing autoscaling thresholds and policies.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: load-generator
+  namespace: default
+  labels:
+    app: load-generator
+    test-case: uc01
+  annotations:
+    description: "Generates load to test HPA behavior"
+spec:
+  restartPolicy: Never
+  
+  containers:
+  - name: load-generator
+    image: busybox:1.36.1
+    
+    command:
+    - /bin/sh
+    - -c
+    - |
+      echo "Starting load generation..."
+      echo "Target: http://hpa-test-app-service"
+      echo ""
+      
+      # Wait for service to be ready
+      sleep 10
+      
+      # Generate load for 5 minutes
+      echo "Generating load for 5 minutes..."
+      END_TIME=$(($(date +%s) + 300))
+      
+      while [ $(date +%s) -lt $END_TIME ]; do
+        # Send 10 requests per second
+        for i in $(seq 1 10); do
+          wget -q -O- http://hpa-test-app-service &
+        done
+        sleep 1
+        
+        # Print status every 30 seconds
+        if [ $(($(date +%s) % 30)) -eq 0 ]; then
+          echo "Still generating load... $(date)"
+        fi
+      done
+      
+      echo ""
+      echo "Load generation completed!"
+      echo "Wait 5+ minutes for HPA to scale down..."
+    
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+  
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  # Ensure load generator runs on different node than target pods (if multi-node)
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - hpa-test-app
+          topologyKey: kubernetes.io/hostname
+
+---
+# Alternative: Job-based load generator
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-generator-job
+  namespace: default
+  labels:
+    app: load-generator
+    test-case: uc01
+spec:
+  backoffLimit: 0
+  completions: 1
+  parallelism: 1
+  
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    
+    spec:
+      restartPolicy: Never
+      
+      containers:
+      - name: load-generator
+        image: williamyeh/hey:latest
+        
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Load testing with 'hey' tool..."
+          echo "Target: http://hpa-test-app-service"
+          echo ""
+          
+          # Parameters:
+          # -c: concurrent workers
+          # -q: rate limit (requests per second per worker)
+          # -z: duration
+          
+          hey -c 50 -q 10 -z 5m http://hpa-test-app-service
+          
+          echo ""
+          echo "Load test completed!"
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 128Mi
+
+---
+# Alternative: Deployment-based load generator (for sustained load)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator-sustained
+  namespace: default
+  labels:
+    app: load-generator
+    type: sustained
+spec:
+  replicas: 2  # Multiple load generators
+  
+  selector:
+    matchLabels:
+      app: load-generator
+      type: sustained
+  
+  template:
+    metadata:
+      labels:
+        app: load-generator
+        type: sustained
+    
+    spec:
+      containers:
+      - name: load-generator
+        image: alpine:3.18
+        
+        command:
+        - /bin/sh
+        - -c
+        - |
+          apk add --no-cache curl
+          
+          echo "Starting sustained load generation..."
+          
+          while true; do
+            # Send 5 requests per second per pod
+            for i in 1 2 3 4 5; do
+              curl -s http://hpa-test-app-service > /dev/null &
+            done
+            sleep 1
+          done
+        
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+
+---
+# ConfigMap with load generation scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-generator-scripts
+  namespace: default
+data:
+  light-load.sh: |
+    #!/bin/sh
+    # Light load: 10 req/sec
+    while true; do
+      for i in $(seq 1 10); do
+        wget -q -O- http://hpa-test-app-service &
+      done
+      sleep 1
+    done
+  
+  heavy-load.sh: |
+    #!/bin/sh
+    # Heavy load: 100 req/sec
+    while true; do
+      for i in $(seq 1 100); do
+        wget -q -O- http://hpa-test-app-service &
+      done
+      sleep 1
+    done
+  
+  burst-load.sh: |
+    #!/bin/sh
+    # Burst load: 1000 req then pause
+    while true; do
+      echo "Starting burst..."
+      for i in $(seq 1 1000); do
+        wget -q -O- http://hpa-test-app-service &
+      done
+      echo "Burst complete, pausing 60s..."
+      sleep 60
+    done
+  
+  gradual-load.sh: |
+    #!/bin/sh
+    # Gradually increase load
+    RPS=10
+    while [ $RPS -le 100 ]; do
+      echo "Current load: $RPS req/sec"
+      for i in $(seq 1 $RPS); do
+        wget -q -O- http://hpa-test-app-service &
+      done
+      sleep 1
+      
+      # Increase every 30 seconds
+      if [ $(($(date +%s) % 30)) -eq 0 ]; then
+        RPS=$((RPS + 10))
+      fi
+    done
+
+# Usage Examples:
+#
+# 1. Simple load test:
+#    kubectl apply -f load-generator.yaml
+#    kubectl logs -f load-generator
+#
+# 2. With hey tool (more realistic HTTP load):
+#    kubectl apply -f load-generator.yaml (job section)
+#    kubectl logs -f job/load-generator-job
+#
+# 3. Sustained load:
+#    kubectl apply -f load-generator.yaml (deployment section)
+#    kubectl scale deployment load-generator-sustained --replicas=5
+#
+# 4. Custom scripts:
+#    kubectl create -f load-generator.yaml (ConfigMap section)
+#    kubectl run custom-load --image=alpine --restart=Never -- sh -c "$(kubectl get cm load-generator-scripts -o jsonpath='{.data.heavy-load\.sh}')"
+#
+# 5. Monitor HPA during load:
+#    kubectl get hpa -w
+#    kubectl top pods -l app=hpa-test-app

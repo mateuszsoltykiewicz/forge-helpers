@@ -1,0 +1,238 @@
+# Test Client Pod for Service/Ingress Testing
+#
+# This pod can be used to test service connectivity from within the cluster.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-client
+  namespace: default
+  labels:
+    app: test-client
+    test-case: uc02
+spec:
+  restartPolicy: Never
+  
+  containers:
+  - name: client
+    image: curlimages/curl:8.5.0
+    
+    command:
+    - /bin/sh
+    - -c
+    - |
+      echo "=== Service Connectivity Test ==="
+      echo ""
+      
+      # Test 1: ClusterIP Service (internal DNS)
+      echo "Test 1: ClusterIP Service via DNS"
+      if curl -s -o /dev/null -w "%{http_code}" http://web-app-service | grep -q "200"; then
+        echo "✅ PASS: ClusterIP service accessible"
+      else
+        echo "❌ FAIL: ClusterIP service not accessible"
+      fi
+      echo ""
+      
+      # Test 2: Service with port
+      echo "Test 2: Service with explicit port"
+      if curl -s -o /dev/null -w "%{http_code}" http://web-app-service:80 | grep -q "200"; then
+        echo "✅ PASS: Service port 80 accessible"
+      else
+        echo "❌ FAIL: Service port 80 not accessible"
+      fi
+      echo ""
+      
+      # Test 3: Ingress (requires /etc/hosts or DNS)
+      echo "Test 3: Ingress endpoint"
+      if curl -s -H "Host: web-app.local" -o /dev/null -w "%{http_code}" http://ingress-nginx-controller.ingress-nginx 2>/dev/null | grep -q "200"; then
+        echo "✅ PASS: Ingress accessible"
+      else
+        echo "⚠️  WARN: Ingress not accessible (may need ingress controller)"
+      fi
+      echo ""
+      
+      # Test 4: Multiple requests (load balancing)
+      echo "Test 4: Load balancing (5 requests)"
+      for i in 1 2 3 4 5; do
+        RESPONSE=$(curl -s http://web-app-service | grep -o "Server address: [0-9.]*" || echo "N/A")
+        echo "  Request $i: $RESPONSE"
+      done
+      echo ""
+      
+      # Test 5: Service endpoints
+      echo "Test 5: Checking service endpoints..."
+      echo "  (Run kubectl get endpoints web-app-service to verify)"
+      echo ""
+      
+      echo "=== Tests completed ==="
+      echo ""
+      echo "To test from outside cluster:"
+      echo "1. Port-forward: kubectl port-forward svc/web-app-service 8080:80"
+      echo "2. Access: curl http://localhost:8080"
+      echo ""
+      echo "To test Ingress:"
+      echo "1. Get Ingress IP: kubectl get ingress"
+      echo "2. Add to /etc/hosts: <INGRESS_IP> web-app.local"
+      echo "3. Access: curl http://web-app.local"
+    
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+---
+# Alternative: Interactive Test Pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-client-interactive
+  namespace: default
+  labels:
+    app: test-client
+    type: interactive
+spec:
+  containers:
+  - name: client
+    image: alpine:3.18
+    command: ["/bin/sh"]
+    args: ["-c", "apk add --no-cache curl; sleep 3600"]
+    
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+# Usage:
+# kubectl exec -it test-client-interactive -- sh
+# curl http://web-app-service
+# curl -H "Host: web-app.local" http://<ingress-controller-service>
+
+---
+# Job for automated testing
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: service-test-job
+  namespace: default
+spec:
+  backoffLimit: 2
+  completions: 1
+  
+  template:
+    metadata:
+      labels:
+        app: service-test
+    
+    spec:
+      restartPolicy: Never
+      
+      containers:
+      - name: tester
+        image: curlimages/curl:8.5.0
+        
+        command:
+        - /bin/sh
+        - -c
+        - |
+          SUCCESS=0
+          FAILED=0
+          
+          echo "Testing Service Connectivity..."
+          
+          # Test ClusterIP
+          if curl -s -f http://web-app-service > /dev/null; then
+            echo "✅ ClusterIP service OK"
+            SUCCESS=$((SUCCESS + 1))
+          else
+            echo "❌ ClusterIP service FAILED"
+            FAILED=$((FAILED + 1))
+          fi
+          
+          # Test response content
+          RESPONSE=$(curl -s http://web-app-service)
+          if echo "$RESPONSE" | grep -qi "Server address\|nginx\|hello"; then
+            echo "✅ Response content OK"
+            SUCCESS=$((SUCCESS + 1))
+          else
+            echo "❌ Response content FAILED"
+            FAILED=$((FAILED + 1))
+          fi
+          
+          # Test load balancing (different pod IPs)
+          echo ""
+          echo "Load Balancing Test:"
+          IPS=$(for i in 1 2 3 4 5; do curl -s http://web-app-service | grep -o "Server address: [0-9.]*"; done | sort -u | wc -l)
+          if [ "$IPS" -ge 1 ]; then
+            echo "✅ Service routing to $IPS pod(s)"
+            SUCCESS=$((SUCCESS + 1))
+          else
+            echo "❌ No pod responses"
+            FAILED=$((FAILED + 1))
+          fi
+          
+          echo ""
+          echo "Summary: $SUCCESS passed, $FAILED failed"
+          
+          if [ $FAILED -gt 0 ]; then
+            exit 1
+          fi
+        
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+
+---
+# ConfigMap with test scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-test-scripts
+  namespace: default
+data:
+  test-clusterip.sh: |
+    #!/bin/sh
+    echo "Testing ClusterIP Service..."
+    curl -v http://web-app-service
+  
+  test-ingress.sh: |
+    #!/bin/sh
+    echo "Testing Ingress..."
+    # Get ingress controller service
+    INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    if [ -z "$INGRESS_IP" ]; then
+      INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.clusterIP}')
+    fi
+    curl -v -H "Host: web-app.local" http://$INGRESS_IP
+  
+  test-loadbalancing.sh: |
+    #!/bin/sh
+    echo "Testing Load Balancing..."
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      curl -s http://web-app-service | grep "Server address" || echo "Request $i failed"
+      sleep 0.5
+    done
+  
+  test-performance.sh: |
+    #!/bin/sh
+    echo "Performance Test (100 requests)..."
+    START=$(date +%s)
+    for i in $(seq 1 100); do
+      curl -s -o /dev/null http://web-app-service
+    done
+    END=$(date +%s)
+    DURATION=$((END - START))
+    RPS=$((100 / DURATION))
+    echo "Duration: ${DURATION}s"
+    echo "Requests per second: $RPS"
+
+# Usage:
+# kubectl create -f test-client.yaml
+# kubectl logs test-client
+# kubectl exec -it test-client-interactive -- sh -c "$(kubectl get cm service-test-scripts -o jsonpath='{.data.test-clusterip\.sh}')"

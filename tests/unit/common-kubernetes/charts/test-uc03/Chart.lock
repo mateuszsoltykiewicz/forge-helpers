@@ -1,0 +1,12 @@
+dependencies:
+- name: common-forge
+  repository: file://../../../../../charts/common-forge
+  version: 0.1.0
+- name: common-vault
+  repository: file://../../../../../charts/common-vault
+  version: 0.1.0
+- name: common-kubernetes
+  repository: file://../../../../../charts/common-kubernetes
+  version: 0.1.0
+digest: sha256:0ebdf72ea9ca2d221e39f86a6f8d5fc35263356deb66261e32166d3e4c5126ba
+generated: "2026-02-23T11:57:03.890122+01:00"

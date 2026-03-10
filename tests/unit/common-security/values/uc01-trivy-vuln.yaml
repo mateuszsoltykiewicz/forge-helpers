@@ -1,0 +1,87 @@
+# UC-SECURITY-01: Trivy Vulnerability Scanning Configuration
+
+trivy:
+  enabled: true
+  
+  # Trivy Operator configuration
+  operator:
+    # Automatic scanning on pod creation
+    scanJobsInNamespace: "*"          # Scan all namespaces
+    
+    # Vulnerability report settings
+    vulnerabilityReports:
+      enabled: true
+      scanner:
+        reportType: "summary"
+        skipUpdate: false               # Update vulnerability DB regularly
+        
+    # Configuration audit reports (bonus: misconfigurations)
+    configAuditReports:
+      enabled: true
+      
+    # Exposed secret reports (bonus: detect hardcoded secrets)
+    exposedsecretReports:
+      enabled: true
+    
+    # Severity levels to report
+    severity:
+      - CRITICAL
+      - HIGH
+      - MEDIUM
+      - LOW
+      
+    # Resource limits for scanner jobs
+    resources:
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+        
+    # Scan job settings
+    scanJobTimeout: "5m"
+    scanJobsConcurrentLimit: 3        # Max 3 concurrent scans
+    
+    # Namespace exclusions
+    excludeNamespaces:
+      - "kube-system"
+      - "kube-public"
+      - "kube-node-lease"
+      
+  # Trivy configuration
+  trivyConfig:
+    # Vulnerability database
+    db:
+      repository: "ghcr.io/aquasecurity/trivy-db"
+      
+    # Vulnerability types to scan
+    vulnerability:
+      type: "os,library"                # OS packages + application libraries
+      
+    # Timeout settings
+    timeout: "5m0s"
+    
+    # Skip files in scan
+    skipFiles:
+      - "/usr/lib/systemd/*"
+      - "/tmp/*"
+      
+    # Skip directories in scan
+    skipDirs:
+      - "/var/cache"
+      - "/var/log"
+
+# Prometheus metrics (optional)
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: "30s"
+    
+# Webhook notifications (optional)
+webhook:
+  enabled: false
+  # url: "https://alerts.example.com/trivy"
+  # secret: "webhook-secret"

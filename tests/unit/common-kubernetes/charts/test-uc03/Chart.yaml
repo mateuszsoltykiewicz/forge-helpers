@@ -1,0 +1,17 @@
+apiVersion: v2
+name: test-uc03-configmap-secret
+description: Test chart for UC03 - ConfigMap and Secret management
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+dependencies:
+  - name: common-forge
+    version: 0.1.0
+    repository: "file://../../../../../charts/common-forge"
+  - name: common-vault
+    version: 0.1.0
+    repository: "file://../../../../../charts/common-vault"
+  - name: common-kubernetes
+    version: 0.1.0
+    repository: "file://../../../../../charts/common-kubernetes"

@@ -1,0 +1,105 @@
+# UC-HARDENING-02: Network Policies
+#
+# Tests NetworkPolicy creation for pod-to-pod communication control
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Application pods
+app:
+  enabled: true
+  name: web-app
+  replicas: 2
+  
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  
+  labels:
+    app: web-app
+    tier: frontend
+  
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+# Ingress NetworkPolicy - Allow specific traffic
+ingressPolicy:
+  enabled: true
+  name: allow-frontend-ingress
+  
+  podSelector:
+    matchLabels:
+      app: web-app
+      tier: frontend
+  
+  ingress:
+    # Allow from ingress controller
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 80
+    
+    # Allow from same namespace
+    - from:
+      - podSelector:
+          matchLabels:
+            tier: frontend
+      ports:
+      - protocol: TCP
+        port: 80
+
+# Egress NetworkPolicy - Restrict outbound
+egressPolicy:
+  enabled: true
+  name: restrict-frontend-egress
+  
+  podSelector:
+    matchLabels:
+      app: web-app
+      tier: frontend
+  
+  egress:
+    # Allow DNS
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      - podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+      ports:
+      - protocol: UDP
+        port: 53
+    
+    # Allow to backend tier
+    - to:
+      - podSelector:
+          matchLabels:
+            tier: backend
+      ports:
+      - protocol: TCP
+        port: 8080
+    
+    # Allow HTTPS to external services
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 443
+
+# Default Deny All NetworkPolicy
+defaultDenyAll:
+  enabled: false  # Enable for zero-trust
+  name: default-deny-all
+  podSelector: {}  # Matches all pods
+  policyTypes:
+    - Ingress
+    - Egress

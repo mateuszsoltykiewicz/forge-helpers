@@ -1,0 +1,193 @@
+# UC-KYVERNO-04: GitOps Workflow (Full Enforcement)
+# Values for complete production GitOps setup
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "production"
+  application: "gitops-full"
+
+kyverno:
+  # ======================================================
+  # API RESTRICTIONS - All enabled for production
+  # ======================================================
+  apiRestrictions:
+    # Block kubectl exec (except debug-proxy)
+    blockExec:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl exec is blocked in production environment.
+        Use debug-proxy ServiceAccount for emergency debugging.
+        All exec operations are logged and audited.
+        Contact platform-team@company.com for break-glass access.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      excludeUsers: []
+      annotations:
+        security-level: "high"
+    
+    # Block kubectl port-forward (except debug-proxy)
+    blockPortForward:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl port-forward is blocked in production.
+        Use Ingress/LoadBalancer or debug-proxy for debugging.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block kubectl proxy (except debug-proxy)
+    blockProxy:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl proxy is blocked in production.
+        Use debug-proxy ServiceAccount for API access.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block ephemeral containers (kubectl debug)
+    blockEphemeralContainers:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: >-
+        Ephemeral containers (kubectl debug) are blocked in production.
+        Use debug-proxy ServiceAccount for debugging.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block kubectl attach (except debug-proxy)
+    blockAttach:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl attach is blocked in production.
+        Use kubectl logs or debug-proxy ServiceAccount.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+  
+  # ======================================================
+  # RESOURCE MANAGEMENT - GitOps enforcement
+  # ======================================================
+  resourceManagement:
+    # Block direct workload modifications (enforce GitOps)
+    blockWorkloadModifications:
+      enabled: true
+      action: "enforce"
+      severity: "high"
+      failurePolicy: "Fail"
+      message: >-
+        Direct workload modifications are blocked in production.
+        All deployments must go through GitOps pipeline (Git → CI/CD → Kubernetes).
+        Push changes to Git repository and let automated pipeline deploy.
+        For emergency changes, use break-glass procedure.
+        Contact platform-team@company.com for assistance.
+      
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      
+      # CI/CD and GitOps operators
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+        - "system:serviceaccount:flux-system:helm-controller"
+        - "system:serviceaccount:flux-system:kustomize-controller"
+        - "system:serviceaccount:flux-system:notification-controller"
+        - "system:serviceaccount:argocd:argocd-application-controller"
+        - "system:serviceaccount:argocd:argocd-server"
+      
+      excludeUsers: []
+      
+      annotations:
+        gitops-policy: "enforced"
+        environment: "production"
+        compliance: "required"
+    
+    # Additional resource management (disabled for this test)
+    blockNetworkingModifications:
+      enabled: false
+    
+    blockConfigModifications:
+      enabled: false
+    
+    blockStorageModifications:
+      enabled: false
+    
+    blockRBACModifications:
+      enabled: false
+  
+  # ======================================================
+  # DEBUG PROXY - Emergency access helper
+  # ======================================================
+  debugProxy:
+    enabled: true
+    namespace: "kube-system"
+    serviceAccount: "debug-proxy"
+    
+    # Lightweight kubectl image
+    image: "bitnami/kubectl:latest"
+    imagePullPolicy: "IfNotPresent"
+    
+    # Single replica (not HA for test environment)
+    replicas: 1
+    
+    # Resource limits
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    
+    # Pod annotations
+    annotations:
+      description: "Emergency debug proxy for production incidents"
+      incident-response: "true"
+      managed-by: "kyverno-helm-chart"
+      security-notice: "All operations logged and audited"
+    
+    # Pod labels
+    labels:
+      role: "debug"
+      access-level: "restricted"
+      environment: "production"
+    
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: false

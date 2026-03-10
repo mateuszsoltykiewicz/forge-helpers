@@ -1,0 +1,88 @@
+# UC-HARDENING-01: Pod Security Standards
+#
+# Tests Pod Security Standards (PSS) enforcement at namespace level
+
+# Pod Security Standards Configuration
+podSecurityStandards:
+  enabled: true
+  enforce: restricted  # privileged, baseline, or restricted
+  audit: restricted
+  warn: restricted
+
+# Compliant Pod (passes restricted PSS)
+compliantPod:
+  enabled: true
+  name: pss-compliant-pod
+  
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+    
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 101
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false  # nginx needs write for logs
+    seccompProfile:
+      type: RuntimeDefault
+  
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Non-Compliant Pod (violates restricted PSS - for testing)
+nonCompliantPod:
+  enabled: false  # Enable manually for testing violations
+  name: pss-violation-pod
+  
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  
+  # Violates PSS: runs as root
+  securityContext:
+    runAsUser: 0  # root user - VIOLATION
+  
+  containerSecurityContext:
+    privileged: true  # privileged container - VIOLATION
+    allowPrivilegeEscalation: true  # VIOLATION
+    capabilities:
+      add:
+        - SYS_ADMIN  # dangerous capability - VIOLATION
+
+# Real-World PSS Examples:
+#
+# 1. Privileged Level (most permissive):
+#    podSecurityStandards:
+#      enforce: privileged
+#    # Allows everything (legacy/insecure workloads)
+#
+# 2. Baseline Level (minimal restrictions):
+#    podSecurityStandards:
+#      enforce: baseline
+#    # Prevents known privilege escalations
+#    # Allows: hostNetwork, hostPID, hostIPC (with restrictions)
+#
+# 3. Restricted Level (hardened, recommended):
+#    podSecurityStandards:
+#      enforce: restricted
+#    # Requires:
+#    #   - runAsNonRoot: true
+#    #   - allowPrivilegeEscalation: false
+#    #   - drop ALL capabilities
+#    #   - seccomp profile
+#    #   - no hostPath volumes

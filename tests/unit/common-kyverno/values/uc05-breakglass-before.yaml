@@ -1,0 +1,66 @@
+# UC-KYVERNO-05: Break-Glass Procedure - Initial State (Full Enforcement)
+# This represents the normal production state before break-glass is granted
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "production"
+  application: "breakglass-test"
+
+kyverno:
+  # API Restrictions - Full enforcement, no user exclusions
+  apiRestrictions:
+    blockExec:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      message: >-
+        kubectl exec is blocked in production.
+        For emergency access, request break-glass procedure.
+      excludeUsers: []  # No user exclusions initially
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "not-active"
+    
+    blockPortForward:
+      enabled: true
+      action: "enforce"
+      excludeUsers: []
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+    
+    blockProxy:
+      enabled: true
+      action: "enforce"
+      excludeUsers: []
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+  
+  # Resource Management - Full enforcement, no user exclusions
+  resourceManagement:
+    blockWorkloadModifications:
+      enabled: true
+      action: "enforce"
+      severity: "high"
+      message: >-
+        Direct workload modifications blocked.
+        Use GitOps pipeline or request break-glass for emergencies.
+      excludeUsers: []  # No user exclusions initially
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "not-active"
+  
+  # Debug proxy disabled for break-glass test
+  debugProxy:
+    enabled: false

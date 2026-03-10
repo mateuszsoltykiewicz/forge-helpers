@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: latency-test-app
+  labels:
+    app: latency-test
+    test: slo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: latency-test
+  template:
+    metadata:
+      labels:
+        app: latency-test
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/stefanprodan/podinfo:6.3.6
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: http-metrics
+        env:
+        - name: PODINFO_UI_COLOR
+          value: "#34577c"
+        command:
+        - ./podinfo
+        - --port=8080
+        - --port-metrics=9090
+        - --grpc-port=9999
+        - --level=info
+        - --random-delay=false
+        - --random-error=false
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: latency-test-app
+  labels:
+    app: latency-test
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: http-metrics
+  selector:
+    app: latency-test
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: latency-test-app
+  labels:
+    app: latency-test
+spec:
+  selector:
+    matchLabels:
+      app: latency-test
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics

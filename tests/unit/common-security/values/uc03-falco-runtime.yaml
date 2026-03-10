@@ -1,0 +1,165 @@
+# UC-SECURITY-03: Falco Runtime Protection Configuration
+
+falco:
+  enabled: true
+  
+  # Driver configuration - eBPF (modern, no kernel module needed)
+  driver:
+    kind: "ebpf"  # Use eBPF probe (recommended)
+    # kind: "module"  # Alternative: kernel module (requires headers)
+    
+    loader:
+      enabled: true
+      initContainer:
+        enabled: true
+        
+  # DaemonSet configuration
+  daemonset:
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        
+  # Resource limits
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+      
+  # Rule files to load
+  rules:
+    - /etc/falco/falco_rules.yaml          # Default Falco rules
+    - /etc/falco/falco_rules.local.yaml    # Local custom rules
+    - /etc/falco/k8s_audit_rules.yaml      # Kubernetes audit rules
+    
+  # Custom security rules
+  customRules:
+    suspicious-activity.yaml: |
+      # Detect shell spawned in container
+      - rule: Shell Spawned in Container
+        desc: Detect shell execution inside container
+        condition: >
+          spawned_process and container and
+          proc.name in (bash, sh, zsh, ksh, dash, fish)
+        output: >
+          Shell spawned in container (container=%container.name 
+          pod=%k8s.pod.name namespace=%k8s.ns.name 
+          command=%proc.cmdline user=%user.name uid=%user.uid)
+        priority: WARNING
+        tags: [container, shell, mitre_execution, T1059]
+        
+      # Detect writes to /etc directory
+      - rule: Write to Etc Directory
+        desc: Detect unauthorized writes to /etc
+        condition: >
+          open_write and container and
+          fd.name startswith /etc/ and
+          not proc.name in (dpkg, apt, yum, rpm)
+        output: >
+          Write to /etc detected (container=%container.name 
+          file=%fd.name process=%proc.name user=%user.name)
+        priority: WARNING
+        tags: [filesystem, container, persistence]
+        
+      # Detect suspicious network connections
+      - rule: Suspicious Outbound Connection
+        desc: Detect connection to unusual port
+        condition: >
+          outbound and container and
+          fd.sport > 32768 and
+          not fd.dport in (80, 443, 8080, 8443, 3306, 5432, 6379, 27017)
+        output: >
+          Suspicious network connection (container=%container.name 
+          dest=%fd.rip:%fd.rport src_port=%fd.sport)
+        priority: WARNING
+        tags: [network, container, exfiltration]
+        
+      # Detect privilege escalation attempts
+      - rule: Privilege Escalation Attempt
+        desc: Detect setuid to root
+        condition: >
+          evt.type=setuid and container and
+          evt.arg.uid=0 and
+          user.uid != 0
+        output: >
+          Privilege escalation attempt (container=%container.name 
+          user=%user.name target_uid=0)
+        priority: CRITICAL
+        tags: [privilege, escalation, T1068]
+        
+      # Detect crypto mining
+      - rule: Crypto Mining Activity
+        desc: Detect crypto mining processes
+        condition: >
+          spawned_process and container and
+          (proc.name in (xmrig, minerd, cgminer, ethminer, claymore) or
+           proc.cmdline contains "stratum+tcp" or
+           proc.cmdline contains "mining.pool")
+        output: >
+          Crypto mining detected (container=%container.name 
+          process=%proc.name command=%proc.cmdline)
+        priority: CRITICAL
+        tags: [crypto, mining, resource_abuse]
+        
+  # Alert outputs
+  outputs:
+    # Standard output (logs)
+    stdout:
+      enabled: true
+      
+    # File output
+    file:
+      enabled: true
+      path: "/var/log/falco/events.log"
+      
+    # Webhook (optional - disabled by default)
+    webhook:
+      enabled: false
+      # url: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+      
+  # Alert configuration
+  alerts:
+    priority: "WARNING"      # Minimum priority to alert (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    rate: 1                  # Max alerts per second per rule
+    max_burst: 1000          # Max alert queue size
+    
+  # Performance tuning
+  performance:
+    buffered_outputs: true
+    drop_failed_exit: false
+    syscall_event_drops:
+      actions:
+        - log
+        - alert
+      rate: 0.03333          # Log if drops > 3.33%
+      
+  # Syscall buffering
+  syscall_buf_size_preset: 4  # 0-8, higher = more memory but fewer drops
+  
+  # Falco metrics
+  metrics:
+    enabled: true
+    interval: "1h"
+    output_rule: true
+    rules_counters_enabled: true
+    
+# Optional: Falco Sidekick for advanced alert routing
+falcoSidekick:
+  enabled: false
+  
+  # webui:
+  #   enabled: true
+  #   replicaCount: 1
+  #   redis:
+  #     storageEnabled: true
+  #     
+  # slack:
+  #   webhookurl: ""
+  #   minimumpriority: "warning"
+  #   
+  # pagerduty:
+  #   integrationkey: ""
+  #   minimumpriority: "critical"

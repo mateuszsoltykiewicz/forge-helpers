@@ -1,0 +1,51 @@
+# Common Monitoring - Test Values
+# UC03: SLO Monitoring (P99 Latency)
+
+testCase: "UC03-slo-latency"
+environment: "test"
+
+forge:
+  customer: "test"
+  project: "monitoring"
+  environment: "test"
+  service: "slo-latency"
+
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    
+    rules:
+      slo:
+        enabled: true
+        
+        # P99 latency SLO
+        latency:
+          enabled: true
+          p99Threshold: "500ms"  # Alert if P99 > 500ms
+          evaluationInterval: "5m"
+          severity: "warning"
+          annotations:
+            summary: "High P99 latency detected"
+            description: "P99 latency is {{ $value }}ms (threshold: 500ms)"
+            runbook_url: "https://docs.example.com/runbooks/high-latency"
+        
+        # Error rate SLO
+        errorRate:
+          enabled: true
+          threshold: "0.05"  # 5% error rate
+          severity: "critical"
+      
+      availability:
+        enabled: false
+    
+    serviceMonitor:
+      enabled: true
+
+  grafana:
+    enabled: false
+
+commonLabels:
+  test-case: "uc03-slo-latency"
+  test-type: "slo"

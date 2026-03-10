@@ -1,0 +1,153 @@
+# UC-KYVERNO-06: Audit Mode (Staging/Development)
+# Values for testing all policies in audit mode (log only, don't block)
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "staging"
+  application: "audit-test"
+
+kyverno:
+  # ======================================================
+  # API RESTRICTIONS - All in AUDIT mode (log only)
+  # ======================================================
+  apiRestrictions:
+    # kubectl exec - audit only
+    blockExec:
+      enabled: true
+      action: "audit"  # Operations allowed but logged
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl exec detected in staging environment.
+        This operation is logged for audit purposes.
+        In production, this would be blocked.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      excludeUsers: []
+      annotations:
+        audit-mode: "enabled"
+        environment: "staging"
+        policy-testing: "true"
+    
+    # kubectl port-forward - audit only
+    blockPortForward:
+      enabled: true
+      action: "audit"
+      severity: "low"
+      message: >-
+        kubectl port-forward detected in staging.
+        Logged for audit purposes.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+      annotations:
+        audit-mode: "enabled"
+    
+    # kubectl proxy - audit only
+    blockProxy:
+      enabled: true
+      action: "audit"
+      severity: "low"
+      message: >-
+        kubectl proxy detected in staging.
+        Logged for audit purposes.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+      annotations:
+        audit-mode: "enabled"
+    
+    # Ephemeral containers (kubectl debug) - audit only
+    blockEphemeralContainers:
+      enabled: true
+      action: "audit"
+      severity: "medium"
+      message: >-
+        kubectl debug (ephemeral containers) detected in staging.
+        Logged for audit purposes.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+      annotations:
+        audit-mode: "enabled"
+    
+    # kubectl attach - audit only
+    blockAttach:
+      enabled: true
+      action: "audit"
+      severity: "low"
+      message: >-
+        kubectl attach detected in staging.
+        Logged for audit purposes.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+      annotations:
+        audit-mode: "enabled"
+  
+  # ======================================================
+  # RESOURCE MANAGEMENT - All in AUDIT mode
+  # ======================================================
+  resourceManagement:
+    # Workload modifications - audit only
+    blockWorkloadModifications:
+      enabled: true
+      action: "audit"  # Operations allowed but logged
+      severity: "high"
+      message: >-
+        Direct workload modification detected in staging.
+        This operation is logged for audit purposes.
+        In production, GitOps workflow would be enforced.
+      
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+        - "system:serviceaccount:flux-system:helm-controller"
+        - "system:serviceaccount:flux-system:kustomize-controller"
+      
+      excludeUsers: []
+      
+      annotations:
+        audit-mode: "enabled"
+        environment: "staging"
+        gitops-policy: "audit-only"
+        transition-plan: "enforce-in-4-weeks"
+    
+    # Additional resource management (disabled for this test)
+    blockNetworkingModifications:
+      enabled: false
+    
+    blockConfigModifications:
+      enabled: false
+    
+    blockStorageModifications:
+      enabled: false
+    
+    blockRBACModifications:
+      enabled: false
+  
+  # ======================================================
+  # DEBUG PROXY - Not needed in audit mode
+  # ======================================================
+  debugProxy:
+    enabled: false
+    # Debug-proxy not needed since all operations allowed in audit mode
+    # Users can exec/port-forward directly for testing

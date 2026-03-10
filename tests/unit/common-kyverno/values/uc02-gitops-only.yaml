@@ -1,0 +1,75 @@
+# UC-KYVERNO-02: Block Direct Deployments (GitOps-only pattern)
+# Values for testing blockWorkloadModifications policy
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "test"
+  application: "gitops-test"
+
+kyverno:
+  # Resource Management policies
+  resourceManagement:
+    # Block direct workload modifications (enforce GitOps)
+    blockWorkloadModifications:
+      enabled: true
+      action: "enforce"  # Block all direct modifications
+      severity: "high"
+      failurePolicy: "Fail"
+      
+      message: >-
+        Direct workload modifications are not allowed. 
+        Use Helm charts deployed via operators or deployment jobs.
+        GitOps workflow required. Contact platform-team@company.com for assistance.
+      
+      # Exclude system namespaces
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      
+      # Allow CI/CD and GitOps operators
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+      
+      # No user exclusions (all users blocked)
+      excludeUsers: []
+      
+      annotations:
+        gitops-policy: "enforced"
+        managed-by: "kyverno"
+    
+    # Disable other resource management policies
+    blockNetworkingModifications:
+      enabled: false
+    
+    blockConfigModifications:
+      enabled: false
+    
+    blockStorageModifications:
+      enabled: false
+    
+    blockRBACModifications:
+      enabled: false
+  
+  # Disable all API restrictions
+  apiRestrictions:
+    blockExec:
+      enabled: false
+    
+    blockPortForward:
+      enabled: false
+    
+    blockProxy:
+      enabled: false
+    
+    blockEphemeralContainers:
+      enabled: false
+    
+    blockAttach:
+      enabled: false
+  
+  # Disable debug proxy
+  debugProxy:
+    enabled: false

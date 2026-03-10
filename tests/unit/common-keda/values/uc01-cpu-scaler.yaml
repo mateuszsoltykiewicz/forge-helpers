@@ -1,0 +1,27 @@
+# UC-KEDA-01: CPU-based ScaledObject
+
+kedaScaledObject:
+  enabled: true
+  name: cpu-scaler
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"
+
+deployment:
+  enabled: true
+  name: cpu-test-app
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

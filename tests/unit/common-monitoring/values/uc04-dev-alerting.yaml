@@ -1,0 +1,81 @@
+# UC-MONITORING-04: Development Environment - Permissive Alerting Configuration
+
+monitoring:
+  enabled: true
+  
+  # Pod crash detection - very permissive threshold
+  podCrashLooping:
+    enabled: true
+    threshold: 10                   # Alert after 10 restarts
+    evaluationInterval: "10m"       # Check every 10 minutes
+    severity: "info"
+    annotations:
+      summary: "Pod {{ $labels.pod }} is crash looping in development"
+      description: "Pod {{ $labels.pod }} has restarted {{ $value }} times (threshold: 10)"
+      runbook_url: "https://wiki.example.com/dev-debugging"
+    labels:
+      team: "development"
+      environment: "development"
+      
+  # Resource usage monitoring - very permissive thresholds
+  resourceUsage:
+    enabled: true
+    
+    cpu:
+      enabled: true
+      threshold: 95                 # 95% CPU utilization
+      evaluationInterval: "10m"
+      severity: "info"
+      annotations:
+        summary: "High CPU usage in dev pod {{ $labels.pod }}"
+        description: "CPU usage is {{ $value }}% (threshold: 95%)"
+        
+    memory:
+      enabled: true
+      threshold: 98                 # 98% memory utilization
+      evaluationInterval: "10m"
+      severity: "info"
+      annotations:
+        summary: "High memory usage in dev pod {{ $labels.pod }}"
+        description: "Memory usage is {{ $value }}% (threshold: 98%)"
+        
+  # SLO monitoring - disabled for development
+  slo:
+    latency:
+      enabled: false                # No latency SLO for dev
+      
+    errorRate:
+      enabled: false                # No error rate SLO for dev
+
+# Alerting configuration - minimal notifications
+alerting:
+  enabled: true
+  
+  route:
+    receiver: "null"                # No external notifications
+    groupWait: "5m"                 # Wait 5 minutes before sending
+    groupInterval: "30m"            # Group alerts over 30 minutes
+    repeatInterval: "0"             # Never repeat (send once)
+    groupBy:
+      - 'namespace'                 # Coarse-grained grouping
+      
+  # No inhibition rules for development
+  inhibition:
+    enabled: false
+
+# Prometheus configuration - minimal resources
+prometheus:
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+      
+  retention: "7d"                   # 7 days retention for development
+  
+  scrapeInterval: "1m"              # Scrape every minute (less frequent)
+  evaluationInterval: "1m"          # Evaluate rules every minute
+  
+  storageSize: "20Gi"               # 20GB storage (minimal)

@@ -1,0 +1,26 @@
+# UC-KEDA-02: Cron-based ScaledObject
+
+kedaScaledObject:
+  enabled: true
+  name: cron-scaler
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: cron
+      metadata:
+        timezone: UTC
+        start: "0 8 * * *"   # Scale up at 8 AM
+        end: "0 18 * * *"    # Scale down at 6 PM
+        desiredReplicas: "5"
+
+deployment:
+  enabled: true
+  name: cron-test-app
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi

@@ -1,0 +1,192 @@
+# UC-KUBERNETES-04: RBAC (Role-Based Access Control)
+#
+# Tests ServiceAccount, Role, RoleBinding, ClusterRole, and ClusterRoleBinding creation
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: rbac-test-sa
+  automountServiceAccountToken: true
+  
+  annotations:
+    description: "Test service account for RBAC validation"
+  
+  labels:
+    app: rbac-test
+    component: auth
+
+# Role (namespace-scoped permissions)
+role:
+  create: true
+  name: rbac-test-role
+  
+  rules:
+    # Pods permissions
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list", "watch"]
+    
+    # Pod logs
+    - apiGroups: [""]
+      resources: ["pods/log"]
+      verbs: ["get"]
+    
+    # ConfigMaps
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list"]
+    
+    # Secrets (limited)
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["get"]
+      resourceNames: ["allowed-secret"]  # Specific secret only
+
+# RoleBinding (binds Role to ServiceAccount)
+roleBinding:
+  create: true
+  name: rbac-test-binding
+  
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: rbac-test-role
+  
+  subjects:
+    - kind: ServiceAccount
+      name: rbac-test-sa
+      namespace: default
+
+# ClusterRole (cluster-wide permissions)
+clusterRole:
+  create: true
+  name: rbac-test-clusterrole
+  
+  rules:
+    # Nodes (read-only)
+    - apiGroups: [""]
+      resources: ["nodes"]
+      verbs: ["get", "list"]
+    
+    # Namespaces (read-only)
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list"]
+    
+    # Custom Resource Definitions
+    - apiGroups: ["apiextensions.k8s.io"]
+      resources: ["customresourcedefinitions"]
+      verbs: ["get", "list"]
+
+# ClusterRoleBinding (binds ClusterRole to ServiceAccount)
+clusterRoleBinding:
+  create: true
+  name: rbac-test-cluster-binding
+  
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: rbac-test-clusterrole
+  
+  subjects:
+    - kind: ServiceAccount
+      name: rbac-test-sa
+      namespace: default
+
+# Test Pod (uses ServiceAccount)
+deployment:
+  enabled: true
+  name: rbac-test-app
+  replicaCount: 1
+  
+  serviceAccountName: rbac-test-sa
+  
+  image:
+    repository: bitnami/kubectl
+    tag: "1.28"
+    pullPolicy: IfNotPresent
+  
+  command: ["/bin/sh"]
+  args:
+    - -c
+    - |
+      echo "=== RBAC Test Pod ==="
+      echo "ServiceAccount: $(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)"
+      echo ""
+      
+      echo "Testing permissions..."
+      
+      # Should succeed (Role allows)
+      echo "1. List pods in namespace:"
+      kubectl get pods || echo "FAILED"
+      
+      # Should succeed (Role allows)
+      echo ""
+      echo "2. Get pod logs:"
+      kubectl logs rbac-test-app-xxx 2>&1 | head -3 || echo "FAILED"
+      
+      # Should succeed (ClusterRole allows)
+      echo ""
+      echo "3. List nodes:"
+      kubectl get nodes || echo "FAILED"
+      
+      # Should fail (not permitted)
+      echo ""
+      echo "4. Delete pod (should fail):"
+      kubectl delete pod test-pod 2>&1 | head -1 || echo "FAILED (expected)"
+      
+      echo ""
+      echo "Sleeping... Check logs: kubectl logs rbac-test-app-xxx"
+      sleep 3600
+  
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Real-World RBAC Examples:
+#
+# 1. Read-Only User:
+#    role:
+#      rules:
+#        - apiGroups: [""]
+#          resources: ["pods", "services", "configmaps"]
+#          verbs: ["get", "list", "watch"]
+#        - apiGroups: ["apps"]
+#          resources: ["deployments", "replicasets"]
+#          verbs: ["get", "list"]
+#
+# 2. CI/CD Service Account:
+#    role:
+#      rules:
+#        - apiGroups: [""]
+#          resources: ["pods", "services", "configmaps", "secrets"]
+#          verbs: ["*"]
+#        - apiGroups: ["apps"]
+#          resources: ["deployments", "statefulsets"]
+#          verbs: ["get", "list", "create", "update", "patch"]
+#
+# 3. Monitoring Agent:
+#    clusterRole:
+#      rules:
+#        - apiGroups: [""]
+#          resources: ["nodes", "pods", "services", "endpoints"]
+#          verbs: ["get", "list", "watch"]
+#        - apiGroups: ["apps"]
+#          resources: ["deployments", "daemonsets", "statefulsets"]
+#          verbs: ["get", "list"]
+#        - nonResourceURLs: ["/metrics"]
+#          verbs: ["get"]
+#
+# 4. Backup Operator:
+#    clusterRole:
+#      rules:
+#        - apiGroups: [""]
+#          resources: ["persistentvolumes", "persistentvolumeclaims"]
+#          verbs: ["get", "list", "create"]
+#        - apiGroups: ["snapshot.storage.k8s.io"]
+#          resources: ["volumesnapshots"]
+#          verbs: ["*"]

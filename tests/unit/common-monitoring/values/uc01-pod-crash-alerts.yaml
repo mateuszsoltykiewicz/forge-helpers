@@ -1,0 +1,80 @@
+# Common Monitoring Chart - Test Values
+# UC01: Pod Crash Alerts
+
+# Test metadata
+testCase: "UC01-pod-crash-alerts"
+environment: "test"
+
+# Forge naming convention
+forge:
+  customer: "test"
+  project: "monitoring"
+  environment: "test"
+  service: "alerts"
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    
+    # Alert rules for availability
+    rules:
+      availability:
+        enabled: true
+        
+        # Pod crash looping alert
+        podCrashLooping:
+          enabled: true
+          threshold: 3  # Alert after 3 restarts
+          evaluationInterval: "5m"
+          severity: "warning"
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has restarted {{ $value }} times in the last 5 minutes"
+            runbook_url: "https://docs.example.com/runbooks/pod-crash-looping"
+          labels:
+            component: "availability"
+            team: "platform"
+        
+        # Pod not ready alert (optional, for context)
+        podNotReady:
+          enabled: true
+          threshold: "15m"
+          severity: "warning"
+          
+        # High memory alert (optional)
+        highMemory:
+          enabled: false
+          
+        # High CPU alert (optional)
+        highCPU:
+          enabled: false
+    
+    # Service monitor configuration
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+      scrapeTimeout: "10s"
+  
+  # Grafana configuration (optional for this UC)
+  grafana:
+    enabled: false
+    dashboards:
+      enabled: false
+  
+  # Alertmanager configuration (optional)
+  alertmanager:
+    enabled: false
+
+# Labels for all resources
+commonLabels:
+  test-case: "uc01-pod-crash-alerts"
+  test-type: "availability"
+  
+# Annotations for all resources  
+commonAnnotations:
+  test-description: "Pod crash looping alert test"
+  test-date: "2026-02-21"

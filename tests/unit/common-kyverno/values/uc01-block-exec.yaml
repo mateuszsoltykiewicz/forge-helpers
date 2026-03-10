@@ -1,0 +1,75 @@
+# UC-KYVERNO-01: Block kubectl exec
+# Test Configuration
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "test"
+  application: "policy-test"
+  
+  # Optional metadata
+  team: "platform"
+  owner: "platform-team@company.com"
+
+# Kyverno API Restrictions
+kyverno:
+  # API Restrictions - Block kubectl exec
+  apiRestrictions:
+    blockExec:
+      enabled: true
+      action: "enforce"  # Block requests (use "audit" for logging only)
+      severity: "medium"
+      failurePolicy: "Fail"  # Fail-closed (reject on error)
+      
+      message: >-
+        kubectl exec is not allowed. Use debug proxy ServiceAccount for debugging.
+        Contact platform team for access: platform-team@company.com
+      
+      # Exclude system namespaces
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      
+      # Allow debug-proxy ServiceAccount
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      
+      # No user exclusions (cluster-admin also blocked)
+      excludeUsers: []
+      
+      annotations: {}
+    
+    # Disable other API restrictions for this test
+    blockPortForward:
+      enabled: false
+    
+    blockProxy:
+      enabled: false
+    
+    blockEphemeralContainers:
+      enabled: false
+    
+    blockAttach:
+      enabled: false
+  
+  # Disable resource management policies for this test
+  resourceManagement:
+    blockWorkloadModifications:
+      enabled: false
+    
+    blockNetworkingModifications:
+      enabled: false
+    
+    blockConfigModifications:
+      enabled: false
+    
+    blockStorageModifications:
+      enabled: false
+    
+    blockRBACModifications:
+      enabled: false
+  
+  # Disable debug proxy (we're only testing the policy)
+  debugProxy:
+    enabled: false

@@ -1,0 +1,156 @@
+# UC-SECURITY-04: Scheduled Security Scans
+
+## Overview
+
+This Use Case validates the `common-security` chart's ability to configure **scheduled, automated security scans** using Kubernetes CronJobs. This enables:
+
+- **Periodic vulnerability scanning** of all images in cluster
+- **Compliance audits** on a regular schedule
+- **Drift detection** for new CVEs in existing workloads
+- **Automated reporting** without manual intervention
+
+## Test Objectives
+
+1. **CronJob Creation**: Deploy CronJob for periodic scanning
+2. **Trivy CLI Integration**: Use Trivy CLI in scan jobs
+3. **Multi-Namespace Scanning**: Scan workloads across namespaces
+4. **Report Generation**: Generate and store scan reports
+5. **Success Verification**: Validate job completion and results
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Kubernetes Cluster                         │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              CronJob: security-scan-daily               │   │
+│  │              Schedule: 0 2 * * * (2 AM daily)           │   │
+│  └──────────────────┬──────────────────────────────────────┘   │
+│                     │                                           │
+│                     │ Creates Job                               │
+│                     ▼                                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Job: security-scan-20240221-020000         │   │
+│  │              Pod: Trivy CLI Scanner                     │   │
+│  │                                                         │   │
+│  │  1. Scan all images in namespace(s)                    │   │
+│  │  2. Generate JSON/table report                          │   │
+│  │  3. Upload to S3/PVC/ConfigMap                          │   │
+│  │  4. Send notifications (optional)                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                     │                                           │
+│                     ▼                                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Scan Report Storage                        │   │
+│  │  - ConfigMap: scan-report-latest                        │   │
+│  │  - PVC: /reports/scan-20240221.json                     │   │
+│  │  - S3: s3://bucket/reports/scan-20240221.json           │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- Kubernetes cluster (EKS 1.23+)
+- `kubectl` and `helm` CLI tools
+- Trivy Operator (optional, for VulnerabilityReport CRDs)
+- ServiceAccount with permissions to list pods/images
+- Storage for reports (ConfigMap, PVC, or S3)
+
+## Test Environment
+
+### Values File (`uc04-scheduled-scan.yaml`)
+
+```yaml
+# Scheduled security scanning
+scheduledScans:
+  enabled: true
+  
+  # CronJob configuration
+  cronjob:
+    schedule: "0 2 * * *"  # Daily at 2 AM UTC
+    # schedule: "*/15 * * * *"  # Every 15 minutes (for testing)
+    
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 5
+    concurrencyPolicy: Forbid  # Don't run concurrent scans
+    
+  # Scanner configuration
+  scanner:
+    image: "aquasec/trivy:0.48.0"
+    
+    # Namespaces to scan
+    namespaces:
+      - "default"
+      - "production"
+      - "staging"
+      # - "*"  # Scan all namespaces
+      
+    # Scan options
+    severity: "CRITICAL,HIGH,MEDIUM"
+    scanType: "image"  # image, fs, config
+    format: "json"     # json, table, sarif, cyclonedx
+    
+    # Trivy options
+    skipUpdate: false  # Update vulnerability DB before scan
+    timeout: "10m"
+    
+    # Resource limits
+    resources:
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+      requests:
+        cpu: "1000m"
+        memory: "1Gi"
+        
+  # Report storage
+  reports:
+    # ConfigMap storage
+    configMap:
+      enabled: true
+      name: "security-scan-report"
+      
+    # PersistentVolume storage
+    pvc:
+      enabled: false
+      storageClass: "gp2"
+      size: "10Gi"
+      mountPath: "/reports"
+      
+    # S3 storage (requires AWS credentials)
+    s3:
+      enabled: false
+      bucket: "my-security-reports"
+      prefix: "trivy-scans/"
+      region: "us-east-1"
+      
+  # Notifications
+  notifications:
+    enabled: false
+    
+    # Slack webhook
+    slack:
+      enabled: false
+      webhookUrl: "https://hooks.slack.com/services/XXX"
+      channel: "#security-alerts"
+      
+    # Email
+    email:
+      enabled: false
+      smtp:
+        host: "smtp.example.com"
+        port: 587
+        from: "security@example.com"
+        to: ["team@example.com"]
+
+# RBAC for scanner
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: "security-scanner"
+    annotations:
+      # For AWS IRSA (optional)
+      # eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/trivy-scanner"

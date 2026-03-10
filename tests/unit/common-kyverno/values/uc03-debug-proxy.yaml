@@ -1,0 +1,151 @@
+# UC-KYVERNO-03: Debug Proxy Access (Controlled API Access)
+# Values for testing all API restrictions with debug-proxy exclusion
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "test"
+  application: "debug-test"
+
+kyverno:
+  # API Restrictions - all enabled for comprehensive testing
+  apiRestrictions:
+    # Block kubectl exec (except debug-proxy)
+    blockExec:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl exec is blocked for security. 
+        Use debug-proxy ServiceAccount for emergency debugging.
+        Contact platform-team@company.com for access.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+      excludeUsers: []
+    
+    # Block kubectl port-forward (except debug-proxy)
+    blockPortForward:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl port-forward is blocked. 
+        Use debug-proxy ServiceAccount or service endpoints.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block kubectl proxy (except debug-proxy)
+    blockProxy:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl proxy is blocked. 
+        Use debug-proxy ServiceAccount for API access.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block ephemeral containers (kubectl debug)
+    blockEphemeralContainers:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      failurePolicy: "Fail"
+      message: >-
+        Ephemeral containers (kubectl debug) are blocked. 
+        Use debug-proxy ServiceAccount for debugging.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+    
+    # Block kubectl attach (except debug-proxy)
+    blockAttach:
+      enabled: true
+      action: "enforce"
+      severity: "low"
+      failurePolicy: "Fail"
+      message: >-
+        kubectl attach is blocked. 
+        Use debug-proxy ServiceAccount or logs.
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      excludeUsers: []
+  
+  # Disable all resource management policies
+  resourceManagement:
+    blockWorkloadModifications:
+      enabled: false
+    blockNetworkingModifications:
+      enabled: false
+    blockConfigModifications:
+      enabled: false
+    blockStorageModifications:
+      enabled: false
+    blockRBACModifications:
+      enabled: false
+  
+  # Enable debug proxy helper (creates debug-proxy pod)
+  debugProxy:
+    enabled: true
+    namespace: "kube-system"
+    serviceAccount: "debug-proxy"
+    
+    # Use lightweight kubectl image
+    image: "bitnami/kubectl:latest"
+    imagePullPolicy: "IfNotPresent"
+    
+    replicas: 1
+    
+    # Resource limits
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    
+    # Pod annotations
+    annotations:
+      description: "Emergency debug proxy with controlled API access"
+      managed-by: "kyverno-helm-chart"
+    
+    # Pod labels (in addition to standard forge.labels)
+    labels:
+      role: "debug"
+      access-level: "restricted"
+    
+    # Node selector (optional)
+    nodeSelector: {}
+    
+    # Tolerations (optional)
+    tolerations: []
+    
+    # Affinity (optional)
+    affinity: {}
+    
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      capabilities:
+        drop:
+          - ALL

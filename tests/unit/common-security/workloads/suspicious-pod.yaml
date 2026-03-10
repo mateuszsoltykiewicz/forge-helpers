@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: suspicious-pod
+  labels:
+    app: security-test
+    test-type: falco-detection
+spec:
+  containers:
+  - name: suspicious
+    image: alpine:3.18
+    command:
+    - sh
+    - -c
+    - |
+      echo "========================================="
+      echo "Starting Falco Detection Test"
+      echo "========================================="
+      sleep 5
+      
+      echo ""
+      echo "[TEST 1] Spawning shell..."
+      /bin/sh -c "echo 'Shell execution test'" 
+      sleep 3
+      
+      echo ""
+      echo "[TEST 2] Writing to /etc directory..."
+      touch /etc/test-falco-detection 2>/dev/null || echo "Write blocked (expected)"
+      sleep 3
+      
+      echo ""
+      echo "[TEST 3] Attempting suspicious network connection..."
+      nc -w 2 example.com 9999 2>/dev/null || echo "Connection failed (expected)"
+      sleep 3
+      
+      echo ""
+      echo "[TEST 4] Running multiple shell commands..."
+      /bin/bash -c "echo 'Testing bash'" 2>/dev/null || /bin/sh -c "echo 'Using sh instead'"
+      sleep 3
+      
+      echo ""
+      echo "========================================="
+      echo "Test activities completed"
+      echo "Check Falco logs for alerts"
+      echo "========================================="
+      
+      # Keep container running
+      sleep 3600
+      
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+        
+    securityContext:
+      # Deliberately permissive for testing Falco detection
+      allowPrivilegeEscalation: true
+      runAsNonRoot: false
+      capabilities:
+        add:
+          - NET_RAW  # For nc command
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: suspicious-pod-svc
+  labels:
+    app: security-test
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: security-test

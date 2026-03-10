@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-validator
+  labels:
+    app: config-validator
+spec:
+  restartPolicy: Never
+  containers:
+  - name: validator
+    image: busybox:1.36.1
+    command:
+    - /bin/sh
+    - -c
+    - |
+      echo "=== Validating ConfigMap and Secret ==="
+      PASSED=0
+      FAILED=0
+      
+      # Test environment variables
+      if [ -n "$APP_NAME" ]; then
+        echo "✅ APP_NAME from ConfigMap: $APP_NAME"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ APP_NAME not set"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      if [ -n "$DATABASE_PASSWORD" ]; then
+        echo "✅ DATABASE_PASSWORD from Secret: (hidden)"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ DATABASE_PASSWORD not set"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      # Test mounted files
+      if [ -f /config/app.conf ]; then
+        echo "✅ ConfigMap file mounted"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ ConfigMap file not found"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      if [ -f /secrets/credentials.txt ]; then
+        echo "✅ Secret file mounted"
+        PASSED=$((PASSED + 1))
+      else
+        echo "❌ Secret file not found"
+        FAILED=$((FAILED + 1))
+      fi
+      
+      echo ""
+      echo "Summary: $PASSED passed, $FAILED failed"
+      [ $FAILED -eq 0 ] || exit 1
+    env:
+    - name: APP_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: app-config
+          key: APP_NAME
+    - name: DATABASE_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: app-secrets
+          key: DATABASE_PASSWORD
+    volumeMounts:
+    - name: config-volume
+      mountPath: /config
+    - name: secret-volume
+      mountPath: /secrets
+  volumes:
+  - name: config-volume
+    configMap:
+      name: app-config
+  - name: secret-volume
+    secret:
+      secretName: app-secrets

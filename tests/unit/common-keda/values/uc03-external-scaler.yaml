@@ -1,0 +1,26 @@
+# UC-KEDA-03: External Scaler (Prometheus)
+
+kedaScaledObject:
+  enabled: true
+  name: prometheus-scaler
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server:9090
+        metricName: http_requests_per_second
+        query: sum(rate(http_requests_total[1m]))
+        threshold: "100"
+
+deployment:
+  enabled: true
+  name: external-test-app
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi

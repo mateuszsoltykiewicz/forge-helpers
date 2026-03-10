@@ -1,0 +1,77 @@
+# UC-KYVERNO-05: Break-Glass Procedure - After Revocation
+# Return to full enforcement after emergency resolved
+
+forge:
+  customer: "test"
+  project: "kyverno"
+  environment: "production"
+  application: "breakglass-test"
+
+kyverno:
+  # API Restrictions - User removed, enforcement restored
+  apiRestrictions:
+    blockExec:
+      enabled: true
+      action: "enforce"
+      severity: "medium"
+      message: >-
+        kubectl exec is blocked in production.
+        Break-glass procedure complete, access revoked.
+      excludeUsers: []  # Break-glass access revoked
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "revoked"
+        revoked-at: "2026-02-21T11:00:00Z"
+        revoked-by: "platform-team"
+        duration: "30 minutes"
+        incident-id: "INC-1234"
+        incident-status: "resolved"
+    
+    blockPortForward:
+      enabled: true
+      action: "enforce"
+      excludeUsers: []
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "revoked"
+    
+    blockProxy:
+      enabled: true
+      action: "enforce"
+      excludeUsers: []
+      excludeServiceAccounts:
+        - "system:serviceaccount:kube-system:debug-proxy"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "revoked"
+  
+  # Resource Management - User removed, enforcement restored
+  resourceManagement:
+    blockWorkloadModifications:
+      enabled: true
+      action: "enforce"
+      severity: "high"
+      message: >-
+        Direct workload modifications blocked.
+        GitOps workflow enforced.
+      excludeUsers: []  # Break-glass access revoked
+      excludeServiceAccounts:
+        - "system:serviceaccount:ci-cd:deployment-job"
+        - "system:serviceaccount:flux-system:flux-cd"
+      excludeNamespaces:
+        - "kube-system"
+      annotations:
+        break-glass: "revoked"
+        revoked-at: "2026-02-21T11:00:00Z"
+        post-incident-review: "required"
+  
+  # Debug proxy disabled
+  debugProxy:
+    enabled: false

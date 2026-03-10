@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-nginx
+  labels:
+    app: vulnerable-nginx
+    security-test: trivy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-nginx
+  template:
+    metadata:
+      labels:
+        app: vulnerable-nginx
+        security-test: trivy
+    spec:
+      containers:
+      - name: nginx
+        # Old nginx version with known CVEs
+        # CVE-2018-16843: CRITICAL - CPU exhaustion DoS
+        # CVE-2018-16844: HIGH - Buffer overflow in memcpy
+        # CVE-2018-16845: HIGH - Memory corruption
+        image: nginx:1.14.0
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: false
+          capabilities:
+            drop:
+              - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulnerable-nginx
+  labels:
+    app: vulnerable-nginx
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: vulnerable-nginx

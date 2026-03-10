@@ -1,0 +1,38 @@
+# UC01: IRSA (IAM Roles for ServiceAccounts)
+# Tests AWS IAM role binding to Kubernetes ServiceAccounts for secure AWS API access
+
+serviceAccount:
+  enabled: true
+  name: s3-access-sa
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/s3-read-role"
+
+deployment:
+  enabled: true
+  name: irsa-test-app
+  image: amazon/aws-cli:2.13.0
+  replicas: 1
+  command: ["sleep", "3600"]
+  
+  env:
+    - name: AWS_REGION
+      value: "us-east-1"
+    - name: S3_BUCKET
+      value: "test-bucket"
+
+# IAM role trust policy (applied outside K8s):
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [{
+#     "Effect": "Allow",
+#     "Principal": {
+#       "Federated": "arn:aws:iam::123456789012:oidc-provider/oidc.eks.region.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
+#     },
+#     "Action": "sts:AssumeRoleWithWebIdentity",
+#     "Condition": {
+#       "StringEquals": {
+#         "oidc.eks.region.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:sub": "system:serviceaccount:default:s3-access-sa"
+#       }
+#     }
+#   }]
+# }

@@ -1,0 +1,59 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-app
+  labels:
+    testing: "true"
+    environment: "test"
+    purpose: "helm-chart-testing"
+  annotations:
+    description: "Main namespace for testing Forge Helpers charts"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-blocked
+  labels:
+    testing: "true"
+    environment: "test"
+    kyverno-policy: "enforce"
+    purpose: "policy-testing"
+  annotations:
+    description: "Namespace where Kyverno policies are fully enforced (no exclusions)"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-allowed
+  labels:
+    testing: "true"
+    environment: "test"
+    kyverno-policy: "excluded"
+    purpose: "policy-testing"
+  annotations:
+    description: "Namespace excluded from Kyverno policies for comparison testing"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-cd
+  labels:
+    purpose: "deployment"
+    automated: "true"
+  annotations:
+    description: "Namespace for CI/CD ServiceAccounts (deployment-job, flux-cd, etc.)"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flux-system
+  labels:
+    purpose: "gitops"
+    automated: "true"
+  annotations:
+    description: "Simulated Flux GitOps namespace for testing GitOps workflows"

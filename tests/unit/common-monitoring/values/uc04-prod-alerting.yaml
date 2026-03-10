@@ -1,0 +1,106 @@
+# UC-MONITORING-04: Production Environment - Strict Alerting Configuration
+
+monitoring:
+  enabled: true
+  
+  # Pod crash detection - strict threshold
+  podCrashLooping:
+    enabled: true
+    threshold: 2                    # Alert after 2 restarts
+    evaluationInterval: "3m"        # Check every 3 minutes
+    severity: "critical"
+    annotations:
+      summary: "Pod {{ $labels.pod }} is crash looping in production"
+      description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+      runbook_url: "https://runbooks.example.com/pod-crash-production"
+      priority: "P1"
+      escalation_policy: "production-oncall"
+    labels:
+      team: "platform"
+      environment: "production"
+      
+  # Resource usage monitoring - strict thresholds
+  resourceUsage:
+    enabled: true
+    
+    cpu:
+      enabled: true
+      threshold: 80                 # 80% CPU utilization
+      evaluationInterval: "5m"
+      severity: "critical"
+      annotations:
+        summary: "High CPU usage in production pod {{ $labels.pod }}"
+        description: "CPU usage is {{ $value }}% (threshold: 80%)"
+        
+    memory:
+      enabled: true
+      threshold: 85                 # 85% memory utilization
+      evaluationInterval: "5m"
+      severity: "critical"
+      annotations:
+        summary: "High memory usage in production pod {{ $labels.pod }}"
+        description: "Memory usage is {{ $value }}% (threshold: 85%)"
+        
+  # SLO monitoring - strict latency requirements
+  slo:
+    latency:
+      enabled: true
+      p99Threshold: "300ms"         # 300ms P99 latency
+      evaluationInterval: "5m"
+      severity: "critical"
+      annotations:
+        summary: "P99 latency SLO breach in production"
+        description: "P99 latency is {{ $value }}ms (threshold: 300ms)"
+        runbook_url: "https://runbooks.example.com/latency-slo"
+        
+    errorRate:
+      enabled: true
+      threshold: "0.01"             # 1% error rate
+      evaluationInterval: "5m"
+      severity: "critical"
+      annotations:
+        summary: "Error rate SLO breach in production"
+        description: "Error rate is {{ $value }}% (threshold: 1%)"
+
+# Alerting configuration
+alerting:
+  enabled: true
+  
+  route:
+    receiver: "pagerduty-production"
+    groupWait: "10s"                # Group alerts for 10 seconds
+    groupInterval: "5m"             # Send grouped alerts every 5 minutes
+    repeatInterval: "4h"            # Repeat unresolved alerts every 4 hours
+    groupBy:
+      - 'pod'
+      - 'container'
+      - 'namespace'
+      
+  # Alert inhibition - suppress lower severity alerts when critical fires
+  inhibition:
+    enabled: true
+    rules:
+      - sourceMatch:
+          severity: 'critical'
+        targetMatch:
+          severity: 'warning'
+        equal:
+          - 'namespace'
+          - 'pod'
+
+# Prometheus configuration
+prometheus:
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+      
+  retention: "30d"                  # 30 days retention for production
+  
+  scrapeInterval: "30s"             # Scrape every 30 seconds
+  evaluationInterval: "30s"         # Evaluate rules every 30 seconds
+  
+  storageSize: "100Gi"              # 100GB storage
