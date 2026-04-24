@@ -61,12 +61,12 @@ Forge Platform Labels
 Generates moai.forge.io/* labels for Forge-specific metadata
 
 Labels:
-  moai.forge.io/customer     - Customer identifier
-  moai.forge.io/project      - Project name
-  moai.forge.io/application  - Application name
-  moai.forge.io/environment  - Environment (dev, staging, prod)
-  moai.forge.io/chart        - Chart name-version
-  moai.forge.io/release      - Helm release name
+  forge.moai.io/customer-id  - Customer identifier
+  forge.moai.io/project-id   - Project name
+  forge.moai.io/service      - Service name
+  forge.moai.io/environment  - Environment (dev, staging, prod)
+  forge.moai.io/chart-type   - Chart name-version
+  forge.moai.io/app-name     - Helm release name
 
 Returns: YAML map
 ------------------------------------------------------------------------------
@@ -74,20 +74,20 @@ Returns: YAML map
 {{- define "forge.labels.forge" -}}
 {{- if .Values.forge }}
   {{- if .Values.forge.customer }}
-moai.forge.io/customer: {{ .Values.forge.customer }}
+forge.moai.io/customer-id: {{ .Values.forge.customer }}
   {{- end }}
   {{- if .Values.forge.project }}
-moai.forge.io/project: {{ .Values.forge.project }}
+forge.moai.io/project-id: {{ .Values.forge.project }}
   {{- end }}
-  {{- if .Values.forge.application }}
-moai.forge.io/application: {{ .Values.forge.application }}
+  {{- if .Values.forge.service }}
+forge.moai.io/service: {{ .Values.forge.service }}
   {{- end }}
   {{- if .Values.forge.environment }}
-moai.forge.io/environment: {{ .Values.forge.environment }}
+forge.moai.io/environment: {{ .Values.forge.environment }}
   {{- end }}
 {{- end }}
-moai.forge.io/chart: {{ include "forge.chart" . }}
-moai.forge.io/release: {{ .Release.Name }}
+forge.moai.io/chart-type: {{ include "forge.chart" . }}
+forge.moai.io/app-name: {{ .Release.Name }}
 {{- end -}}
 
 {{/*

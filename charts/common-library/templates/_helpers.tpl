@@ -74,10 +74,10 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if .Values.forgeNaming.enabled }}
-forge.io/customer: {{ .Values.forgeNaming.customer | quote }}
-forge.io/project: {{ .Values.forgeNaming.project | quote }}
-forge.io/environment: {{ .Values.forgeNaming.environment | quote }}
-forge.io/service: {{ .Values.forgeNaming.service | quote }}
+forge.moai.io/customer: {{ .Values.forgeNaming.customer | quote }}
+forge.moai.io/project: {{ .Values.forgeNaming.project | quote }}
+forge.moai.io/environment: {{ .Values.forgeNaming.environment | quote }}
+forge.moai.io/service: {{ .Values.forgeNaming.service | quote }}
 {{- end }}
 {{- with .Values.global.labels }}
 {{ toYaml . }}
