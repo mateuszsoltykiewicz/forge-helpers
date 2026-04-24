@@ -20,9 +20,9 @@ forge:
   # Used in: customerClusterWide, customerNamespace, tenantNamespace patterns
   project: "default-project"
   
-  # Application name
+  # Application name / service identifier
   # Used in: customerNamespace, tenantNamespace, namespacedResource patterns
-  application: "default-app"
+  service: "default-app"
   
   # Environment identifier (dev, staging, prod, etc.)
   # Used in: tenantNamespace pattern for multi-environment deployments

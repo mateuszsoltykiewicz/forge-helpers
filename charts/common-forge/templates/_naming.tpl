@@ -12,7 +12,7 @@ Naming Patterns:
   4. namespacedResource→ "{app}-{type}"                  (app-scoped resources)
   5. customerClusterWide→ "{customer}-{project}"          (cluster-level customer resources)
   6. customerNamespace → "{customer}-{project}-{app}"    (customer namespaces)
-  7. tenantNamespace   → "{customer}-{project}-{app}-{env}" (tenant namespaces)
+  7. tenantNamespace   → "{customer}-{project}-{env}-{app}" (tenant namespaces)
   8. customerResource  → "{app}-{type}"                  (customer resource naming)
 
 Helper Functions:
@@ -119,21 +119,21 @@ Parameters:
 ------------------------------------------------------------------------------
 Pattern 7: Tenant Namespace (Multi-Environment)
 Scope: Tenant-specific namespace with environment
-Format: "{customer}-{project}-{app}-{env}"
+Format: "{customer}-{project}-{env}-{app}"
 Usage: Multi-tenant deployments with environment separation
 Parameters:
   .customer - Customer identifier
   .project  - Project name
-  .app      - Application name
   .env      - Environment (dev, staging, prod)
+  .app      - Application name
 ------------------------------------------------------------------------------
 */}}
 {{- define "forge.name.tenantNamespace" -}}
 {{- $customer := .customer | toString -}}
 {{- $project := .project | toString -}}
-{{- $app := .app | toString -}}
 {{- $env := .env | toString -}}
-{{- printf "%s-%s-%s-%s" $customer $project $app $env -}}
+{{- $app := .app | toString -}}
+{{- printf "%s-%s-%s-%s" $customer $project $env $app -}}
 {{- end -}}
 
 {{/*
@@ -236,7 +236,7 @@ Priority Order:
 Parameters: Uses .Values context
   .Values.forge.customer
   .Values.forge.project
-  .Values.forge.application
+  .Values.forge.service
   .Values.forge.environment
   .Values.fullnameOverride
   .Values.nameOverride
@@ -257,7 +257,7 @@ Returns: DNS-1123 compliant full name (max 63 chars)
 {{- else if .Values.forge -}}
   {{- $customer := .Values.forge.customer | default "" -}}
   {{- $project := .Values.forge.project | default "" -}}
-  {{- $app := .Values.forge.application | default "" -}}
+  {{- $app := .Values.forge.service | default "" -}}
   {{- $env := .Values.forge.environment | default "" -}}
   
   {{- if and $customer $project $app $env -}}
@@ -302,12 +302,12 @@ Applies DNS-1123 sanitization and namespace validation
 {{- if .Values.forge -}}
   {{- if .Values.forge.namespace -}}
     {{- $ns = .Values.forge.namespace -}}
-  {{- else if and .Values.forge.customer .Values.forge.project .Values.forge.application -}}
-    {{- /* Generate namespace from customer/project/app */ -}}
+  {{- else if and .Values.forge.customer .Values.forge.project .Values.forge.service -}}
+    {{- /* Generate namespace from customer/project/service */ -}}
     {{- if .Values.forge.environment -}}
-      {{- $ns = include "forge.name.tenantNamespace" (dict "customer" .Values.forge.customer "project" .Values.forge.project "app" .Values.forge.application "env" .Values.forge.environment) -}}
+      {{- $ns = include "forge.name.tenantNamespace" (dict "customer" .Values.forge.customer "project" .Values.forge.project "app" .Values.forge.service "env" .Values.forge.environment) -}}
     {{- else -}}
-      {{- $ns = include "forge.name.customerNamespace" (dict "customer" .Values.forge.customer "project" .Values.forge.project "app" .Values.forge.application) -}}
+      {{- $ns = include "forge.name.customerNamespace" (dict "customer" .Values.forge.customer "project" .Values.forge.project "app" .Values.forge.service) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
